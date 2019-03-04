@@ -1,4 +1,22 @@
 # my_code_history
+
+Main Code Summary List:
+[2019-03-04, 4:32pm est] Adding all my legacy hobby codes(Pascal, Assemby language and very few beginners C Language) that I was able to save when I was still a teenager and college student. My main college projects\hobby projects will be added later(as of 2019-03-04).
+
+This legacy code collection of mine includes: (from 1989 to 1997)
+* Drawing app source codes with image files that I made, encoded with my own codec.
+* Compression/Decompression (Huffman/Sliding window/etc) source codes.
+* COM Dissasembler source codes.
+* Boot sector/Boot manipulation source codes.
+* Sound manipulation source codes.
+* epson and postscript print manipulation source codes.
+* My own pascal graphics unit replacement source codes which has better performance than turbo pascals own graphics library.
+* Math coprocessor indirect replacement mainly for square-root computation, etc.
+* And other hobby/experimental pascal/assembly language source codes.
+
+===============================================================================
+Historical Coding Background:
+
 This is my historical codes repository.  I will put as much codes I did ever since I started coding programs as a kid at age of 14 as a 1st year highschool freshman at the year 1987 if I can and up to recently this days. Unfortunately, some of my hobby works are gone because either my old 5 inch floppy disks got a bad sector or a virus destroyed some of them or because I reformatted some of my floppy disk from a 1.2MB capacity each into 1.4MB up to 1.6MB capacity. Nope its not using software compression, its pure physical possible formatable capacity using low level progmamming with assembly language manipulating interrupt 13h and calling direct bios system commands using direct port access, this is during 3rd year highschool.  I was too young did not know that the reason a floppy is designed to hold only 1.2MB is to have an acceptable life to survive few years somewhat. The 1.4MB to 1.6MB format for floppy disk diminished its survivability by I guess about 10 folds worst compared to a normal 1.2MB format.
 
 For now, I will just mention the history of what I coded during those times and what system I was using and just a short story how it began.  I will eventually fill up this repository with the codes I was able to save in my backup system while I try to locate all source codes I can upload here.
