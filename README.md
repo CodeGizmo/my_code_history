@@ -12,7 +12,9 @@ This legacy code collection of mine includes: (from 1989 to 1997)
 * epson and postscript print manipulation source codes.
 * My own pascal graphics unit replacement source codes which has better performance than turbo pascals own graphics library.
 * Math coprocessor indirect replacement mainly for square-root computation, etc.
+* Source codes I made to help my close friends project, mainly Lenin, Razette and etc.
 * And other hobby/experimental pascal/assembly language source codes.
+
 
 ===============================================================================
 Historical Coding Background:
