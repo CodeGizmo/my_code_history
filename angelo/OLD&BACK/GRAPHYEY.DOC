@@ -1,0 +1,1017 @@
+unit graphyey;
+INTERFACE
+uses crt,dos;
+var
+  a,gseg,pseg:word;
+  regs:registers;
+
+procedure agraphmode;
+procedure Plot(px,py,pc:WORD);
+procedure Plotxor(px,py:WORD);
+function getplot(px,py:word):word;
+procedure line(x1,y1,x2,y2,c:integer);
+procedure linexor(x1,y1,x2,y2:integer);
+procedure circle(x0,y0,r,c:integer);
+procedure ellipse(x0,y0,a0,b0,c:integer);
+procedure clear;
+procedure flipvert;
+procedure asave(filename:string;var buf);
+procedure fillplate(x,y:integer;pc,bc:byte);
+procedure rotate(x:word;y,size:byte;rotation:boolean);
+procedure compress(filename:string;var buf);
+procedure uncompress(filename:string;var buf);
+procedure implode(filename:string;var buf);
+procedure explode(filename:string;var buf);
+procedure aload(filename:string;var buf);
+procedure enlarge(x,y,size:word);
+
+IMPLEMENTATION
+
+procedure agraphmode;
+const
+  hidata:array[0..15]of byte=($70,$50,$59,$0a,$40,4,$32,$38,2,3,6,7,0,0,0,0);
+begin
+  regs.ax:=6;
+  intr($10,regs);
+asm
+       mov    dx,3dah
+@t1:   in     al,dx
+       test   al,8
+       jz     @t1
+       mov    dx,3ddh
+       mov    al,80h
+       out    dx,al
+       mov    dx,3d8h
+       mov    al,02
+       out    dx,al
+       mov    dx,3d9h
+       mov    al,0
+       out    dx,al
+end;
+  for a:=0 to 9 do
+  begin
+    port[$3d4]:=a;
+    port[$3d5]:=hidata[a];
+  end;
+end;
+
+procedure Plot(px,py,pc:WORD);
+BEGIN
+asm
+        MOV   ES,PSEG
+        MOV   SI,PX
+        CMP   SI,639
+        JA    @END_PLOT
+        MOV   DI,SI
+        shr   di,1
+        shr   di,1
+        MOV   DL,BYTE PTR PY
+        CMP   DL,199
+        JA    @END_PLOT
+        MOV   DH,DL
+        SHR   DH,1
+        shr   dh,1
+        MOV   AL,160
+        MUL   DH
+        ADD   DI,AX
+        MOV   Cx,3
+        and   dx,cx
+        ROR   DX,1
+        ROR   DX,1
+        ROR   DX,1
+        ADD   DI,DX
+        and   si,cx
+        sub   cx,si
+        add   cl,cl
+        mov   bl,byte ptr pc
+        mov   bh,bl
+        shr   bh,1
+        shr   bh,1
+        and   bx,1100000011b
+        mov   al,11111100b
+        rol   al,cl
+        shl   bx,cl
+        AND   ES:BYTE PTR [DI],AL
+        AND   ES:BYTE PTR 32768[DI],AL
+        OR    ES:BYTE PTR [DI],Bl
+        OR    ES:BYTE PTR 32768[DI],Bh
+@END_PLOT:
+end;
+END;{plot}
+
+procedure Plotxor(px,py:WORD);
+BEGIN
+asm
+        MOV   ES,PSEG
+        MOV   SI,PX
+        CMP   SI,639
+        JA    @END_PLOT
+        MOV   DI,SI
+        shr   di,1
+        shr   di,1
+        MOV   DL,BYTE PTR PY
+        CMP   DL,199
+        JA    @END_PLOT
+        MOV   DH,DL
+        SHR   DH,1
+        shr   dh,1
+        MOV   AL,160
+        MUL   DH
+        ADD   DI,AX
+        MOV   Cx,3
+        and   dx,cx
+        ROR   DX,1
+        ROR   DX,1
+        ROR   DX,1
+        ADD   DI,DX
+        and   si,cx
+        sub   cx,si
+        add   cl,cl
+        mov   al,00000011b
+        rol   al,cl
+        shl   bx,cl
+        xor   ES:BYTE PTR [DI],AL
+        xor   ES:BYTE PTR 32768[DI],AL
+@END_PLOT:
+end;
+END;{plotxor}
+
+function getplot(px,py:word):word;
+var
+    pc:byte;
+BEGIN
+asm
+        MOV   ES,gSEG
+        MOV   SI,PX
+        CMP   SI,639
+        JA    @END_PLOT
+        MOV   DI,SI
+        shr   di,1
+        shr   di,1
+        MOV   DL,BYTE PTR PY
+        CMP   DL,199
+        JA    @END_PLOT
+        MOV   DH,DL
+        SHR   DH,1
+        shr   dh,1
+        MOV   AL,160
+        MUL   DH
+        ADD   DI,AX
+        MOV   Cx,3
+        and   dx,cx
+        ROR   DX,1
+        ROR   DX,1
+        ROR   DX,1
+        ADD   DI,DX
+        and   si,cx
+        sub   cx,si
+        add   cl,cl
+        mov   bl,es:byte ptr[di]
+        mov   bh,es:byte ptr 32768[di]
+        mov   ax,1100000011b
+        shl   ax,cl
+        and   bx,ax
+        shr   bx,cl
+        shl   bh,1
+        shl   bh,1
+        add   bl,bh
+        mov   bh,0
+        mov   word ptr pc,bx
+@END_PLOT:
+end;
+        getplot:=pc;
+END;{getplot}
+
+procedure line(x1,y1,x2,y2,c:integer);
+var
+  dx,dy,e,tmp : integer;
+
+begin
+  if x1 > x2 then
+  begin
+    tmp := x1; x1 := x2; x2 := tmp;
+    tmp := y1; y1 := y2; y2 := tmp;
+  end;
+  dx := x2-x1;
+  e  := 0;
+  if y1 <= y2 then
+  begin
+    dy := (y2-y1);
+    if dx >= dy then
+    begin
+      plot(x1,y1,c);
+      while x1<x2 do
+      begin
+        inc(x1);
+        inc(e,dy);
+        inc(e,dy);
+        IF e > dx then
+        begin
+          DEC(e,dx);
+          DEC(e,dx);
+          INC(y1);
+        END;
+        plot(x1,y1,c);
+      end;
+    end else
+    begin
+      plot( x1,y1,c );
+      while y1<y2 do
+      begin
+        inc(y1);
+        inc(e,dx);
+        inc(e,dx);
+        if e > dy then
+        begin
+          dec(e,dy);
+          dec(e,dy);
+          inc(x1);
+        end;
+        plot( x1,y1,c );
+      end;
+    end;
+  end else
+  begin
+    dy := (y1-y2);
+    if dx >= dy then
+    begin
+      plot( x1,y1,c );
+      while x1<x2 do
+      begin
+        inc(x1);
+        inc(e,dy);
+        inc(e,dy);
+        if e > dx then
+        begin
+          dec(e,dx);
+          dec(e,dx);
+          dec(y1);
+        end;
+        plot( x1,y1,c );
+      end;
+    end else
+    begin
+      plot(x1,y1,c);
+      while y1>y2 do
+      begin
+        dec(y1);
+        inc(e,dx);
+        inc(e,dx);
+        if e > dy then
+        begin
+          dec(e,dy);
+          dec(e,dy);
+          inc(x1);
+        end;
+        plot(x1,y1,c);
+      end;
+    end;
+  end;
+end;{line}
+
+procedure linexor(x1,y1,x2,y2:integer);
+var
+  dx,dy,e,tmp : integer;
+
+begin
+  if x1 > x2 then
+  begin
+    tmp := x1; x1 := x2; x2 := tmp;
+    tmp := y1; y1 := y2; y2 := tmp;
+  end;
+  dx := x2-x1;
+  e  := 0;
+  if y1 <= y2 then
+  begin
+    dy := (y2-y1);
+    if dx >= dy then
+    begin
+      plotxor(x1,y1);
+      while x1<x2 do
+      begin
+        inc(x1);
+        inc(e,dy);
+        inc(e,dy);
+        IF e > dx then
+        begin
+          DEC(e,dx);
+          DEC(e,dx);
+          INC(y1);
+        END;
+        plotxor(x1,y1);
+      end;
+    end else
+    begin
+      plotxor(x1,y1);
+      while y1<y2 do
+      begin
+        inc(y1);
+        inc(e,dx);
+        inc(e,dx);
+        if e > dy then
+        begin
+          dec(e,dy);
+          dec(e,dy);
+          inc(x1);
+        end;
+        plotxor(x1,y1);
+      end;
+    end;
+  end else
+  begin
+    dy := (y1-y2);
+    if dx >= dy then
+    begin
+      plotxor(x1,y1);
+      while x1<x2 do
+      begin
+        inc(x1);
+        inc(e,dy);
+        inc(e,dy);
+        if e > dx then
+        begin
+          dec(e,dx);
+          dec(e,dx);
+          dec(y1);
+        end;
+        plotxor(x1,y1);
+      end;
+    end else
+    begin
+      plotxor(x1,y1);
+      while y1>y2 do
+      begin
+        dec(y1);
+        inc(e,dx);
+        inc(e,dx);
+        if e > dy then
+        begin
+          dec(e,dy);
+          dec(e,dy);
+          inc(x1);
+        end;
+        plotxor(x1,y1);
+      end;
+    end;
+  end;
+end;{linexor}
+
+procedure circle(x0,y0,r,c:integer);
+var
+  e,x,y : integer;
+
+begin
+  x := r; y := 0; e := 0;
+  while y <= x do
+  begin
+    plot(x0+x,y0+y,c);
+    plot(x0-x,y0+y,c);
+    plot(x0+x,y0-y,c);
+    plot(x0-x,y0-y,c);
+    plot(x0+y,y0+x,c);
+    plot(x0-y,y0+x,c);
+    plot(x0+y,y0-x,c);
+    plot(x0-y,y0-x,c);
+    inc(y);
+    inc(e,(y shl 1)-1);
+    if e > x then
+    begin
+      dec(x);
+      dec(e,(x shl 1)+1);
+    end;
+  end;
+end;{circle}
+
+procedure ellipse ( x0,y0,a0,b0,c:integer);
+var
+  x,y :integer;
+  a,b,asq,asq2,bsq,bsq2,d,dx,dy:longint;
+begin
+  x := 0 ;
+  y := b0 ;
+  a := a0 ;
+  b := b0 ;
+  asq := a*a ;
+  asq2 := asq*2 ;
+  bsq := b*b ;
+  bsq2 := bsq*2 ;
+  d := bsq-(asq*b)+(asq shr 2) ;
+  dx := 0 ;
+  dy := asq2*b ;
+  while dx<dy do
+  begin
+    {if fill then}
+    plot(x0+x,y0+y,c) ;
+    plot(x0-x,y0+y,c) ;
+    plot(x0+x,y0-y,c) ;
+    plot(x0-x,y0-y,c) ;
+    if d>0 then
+    begin
+      dec(y) ;
+      dec(dy,asq2) ;
+      dec(d,dy) ;
+    end ;
+    inc(x) ;
+    inc(dx,bsq2) ;
+    inc(d,bsq+dx) ;
+  end;
+  inc(d,(3*(asq-bsq)DIV 2-(dx+dy))DIV 2) ;
+  while y>=0 do
+  begin
+    {IF fill THEN
+      HLine(x0-x,y0+y,x0+x,c);
+      HLine(x0-x,y0-y,x0+x,c);
+    ELSE}
+    plot(x0+x,y0+y,c) ;
+    plot(x0-x,y0+y,c) ;
+    plot(x0+x,y0-y,c) ;
+    plot(x0-x,y0-y,c) ;
+    if d<0 then
+    begin
+      inc(x) ;
+      inc(dx,bsq2) ;
+      inc(d,dx) ;
+    end;
+    dec(y) ;
+    dec(dy,asq2) ;
+    inc(d,asq-dy) ;
+  end ;
+end;{ellipse}
+
+procedure clear;
+begin
+  asm
+        mov     ax,0b000h
+        mov     es,ax
+        mov     di,0
+        mov     ax,0
+        mov     cx,07fffh
+        cld
+        rep     stosw
+  end;
+end;{clear}
+
+procedure flipvert;
+begin
+  asm
+        mov     ax,0b000h
+        mov     es,ax
+        mov     si,0
+        mov     di,24224
+        mov     bx,0
+        mov     dx,2
+        mov     cx,50
+  @looper1:
+        push    cx
+        mov     cx,160
+  @looper2:
+        mov     ah,byte ptr es:[bx][si]
+        xchg    byte ptr es:8192[bx][di],ah
+        mov     byte ptr es:[bx][si],ah
+        mov     ah,byte ptr es:32768[bx][si]
+        xchg    byte ptr es:40960[bx][di],ah
+        mov     byte ptr es:32768[bx][si],ah
+
+        mov     ah,byte ptr es:8192[bx][si]
+        xchg    byte ptr es:[bx][di],ah
+        mov     byte ptr es:8192[bx][si],ah
+        mov     ah,byte ptr es:40960[bx][si]
+        xchg    byte ptr es:32768[bx][di],ah
+        mov     byte ptr es:40960[bx][si],ah
+        inc     bx
+        loop    @looper2
+        mov     bx,0
+        add     si,160
+        sub     di,160
+        pop     cx
+        loop    @looper1
+  end;
+end;{flipvert}
+
+procedure asave(filename:string;var buf);
+var
+  f:file;
+begin
+  assign(f,filename);
+  rewrite(f,1);
+  blockwrite(f,buf,$ffff);
+  close(f);
+end;{asave}
+
+var
+  xs                               :array[1..$2000]of word;
+  ys                               :array[1..$2000]of byte;
+
+procedure fillplate(x,y:integer;pc,bc:byte);
+var
+  s:word;
+  c:byte;
+
+begin
+  if bc<16 then begin
+  s:=0;
+  pc:=pc and 15;
+  bc:=bc and 15;
+  plot(x,y,pc);
+  inc(s);xs[s]:=x;ys[s]:=y;
+  inc(s);xs[s]:=x;ys[s]:=y;
+  inc(s);xs[s]:=x;ys[s]:=y;
+  if(not(getplot(x,y-1)in[bc,pc]))and(y<>0)then dec(y)
+  else if(not(getplot(x-1,y)in[bc,pc]))and(x<>0)then dec(x)
+  else if(not(getplot(x,y+1)in[bc,pc]))and(y<>199)then inc(y)
+  else if(not(getplot(x+1,y)in[bc,pc]))and(x<>639)then inc(x);
+  plot(x,y,pc);
+  repeat
+    repeat
+      while((not(getplot(x-1,y)in[bc,pc]))and((getplot(x,y-1)in[bc,pc])or(y=0)))and(x>0)do
+      begin
+        if getplot(x-1,y+1)in[bc,pc]then if not(getplot(x,y+1)in[bc,pc])then
+        begin
+          if s<$2000 then inc(s);
+          xs[s]:=x;
+          ys[s]:=y;
+        end;
+        if not(getplot(x+1,y)in[bc,pc])then
+          if(getplot(x+1,y+1)in[bc,pc])or(y=199)or(getplot(x,y+1)in[bc,pc])then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+        dec(x);
+        plot(x,y,pc);
+      end;
+      while((not(getplot(x,y-1)in[bc,pc]))and((getplot(x+1,y)in[bc,pc])or(x=639)))and(y>0)do
+      begin
+        if getplot(x-1,y-1)in[bc,pc]then if not(getplot(x-1,y)in[bc,pc])then
+        begin
+          if s<$2000 then inc(s);
+          xs[s]:=x;
+          ys[s]:=y;
+        end;
+        if not(getplot(x,y+1)in[bc,pc])then
+          if(getplot(x-1,y+1)in[bc,pc])or(x=0)or(getplot(x-1,y)in[bc,pc]) then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+        dec(y);
+        plot(x,y,pc);
+      end;
+      while((not(getplot(x+1,y)in[bc,pc]))and((getplot(x,y+1)in[bc,pc])or(y=199)))and(x+1<=639)do
+      begin
+        if getplot(x+1,y-1)in[bc,pc]then if not(getplot(x,y-1)in[bc,pc]) then
+        begin
+          if s<$2000 then inc(s);
+          xs[s]:=x;
+          ys[s]:=y;
+        end;
+        if not(getplot(x-1,y)in[bc,pc])then
+          if(getplot(x-1,y-1)in[bc,pc])or(y=0)or(getplot(x,y-1)in[bc,pc])then
+          begin
+          if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+        inc(x);
+        plot(x,y,pc);
+      end;
+      while((not(getplot(x,y+1)in[bc,pc]))and((getplot(x-1,y)in[bc,pc])or(x=0)))and(y+1<=199)do
+      begin
+        if getplot(x+1,y+1)in[bc,pc]then if not(getplot(x+1,y)in[bc,pc])then
+        begin
+          if s<$2000 then inc(s);
+          xs[s]:=x;
+          ys[s]:=y;
+        end;
+        if not(getplot(x,y-1)in[bc,pc])then
+          if(getplot(x+1,y-1)in[bc,pc])or(x=639)or(getplot(x+1,y)in[bc,pc])then
+          begin
+          if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+        inc(y);
+        plot(x,y,pc);
+      end;
+    until(((getplot(x-1,y)in[bc,pc])or(x=0))and((getplot(x,y-1)in[bc,pc])or(y=0)))
+          and(((getplot(x+1,y)in[bc,pc])or(x=639))
+          and((getplot(x,y+1)in[bc,pc])or(y=199)));
+    x:=xs[s];
+    y:=ys[s];
+    dec(s);
+  until s<=0;
+  end else
+  begin
+  s:=0;
+  c:=getplot(x,y)and 15;
+  pc:=pc and 15;
+  if not(c=pc)then
+  begin
+    plot(x,y,pc);
+    inc(s);xs[s]:=x;ys[s]:=y;
+    inc(s);xs[s]:=x;ys[s]:=y;
+    inc(s);xs[s]:=x;ys[s]:=y;
+    if(getplot(x,y-1)=c)and(y<>0)then dec(y)
+    else if(getplot(x-1,y)=c)and(x<>0)then dec(x)
+    else if(getplot(x,y+1)=c)and(y<>199)then inc(y)
+    else if(getplot(x+1,y)=c)and(x<>639)then inc(x);
+    plot(x,y,pc);
+    repeat
+      repeat
+        while((getplot(x-1,y)=c)and((getplot(x,y-1)<>c)or(y=0)))and(x>0)do
+        begin
+          if getplot(x-1,y+1)<>c then if getplot(x,y+1)=c then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x+1,y)=c then
+            if(getplot(x+1,y+1)<>c)or(y=199)or(getplot(x,y+1)<>c)then
+            begin
+              if s<$2000 then inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          dec(x);
+          plot(x,y,pc);
+        end;
+        while((getplot(x,y-1)=c)and((getplot(x+1,y)<>c)or(x=639)))and(y>0)do
+        begin
+          if getplot(x-1,y-1)<>c then if getplot(x-1,y)=c then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x,y+1)=c then
+            if(getplot(x-1,y+1)<>c)or(x=0)or(getplot(x-1,y)<>c) then
+            begin
+              if s<$2000 then inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          dec(y);
+          plot(x,y,pc);
+        end;
+        while((getplot(x+1,y)=c)and((getplot(x,y+1)<>c)or(y=199)))and(x+1<=639)do
+        begin
+          if getplot(x+1,y-1)<>c then if getplot(x,y-1)=c then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x-1,y)=c then
+            if(getplot(x-1,y-1)<>c)or(y=0)or(getplot(x,y-1)<>c)then
+            begin
+            if s<$2000 then inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          inc(x);
+          plot(x,y,pc);
+        end;
+        while((getplot(x,y+1)=c)and((getplot(x-1,y)<>c)or(x=0)))and(y+1<=199)do
+        begin
+          if getplot(x+1,y+1)<>c then if getplot(x+1,y)=c then
+          begin
+            if s<$2000 then inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x,y-1)=c then
+            if(getplot(x+1,y-1)<>c)or(x=639)or(getplot(x+1,y)<>c)then
+            begin
+            if s<$2000 then inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          inc(y);
+          plot(x,y,pc);
+        end;
+      until(((getplot(x-1,y)<>c)or(x=0))and((getplot(x,y-1)<>c)or(y=0)))
+            and(((getplot(x+1,y)<>c)or(x=639))
+            and((getplot(x,y+1)<>c)or(y=199)));
+      x:=xs[s];
+      y:=ys[s];
+      dec(s);
+    until s<=0;
+  end;
+
+  end;
+end;{fillplate}
+
+procedure rotate(x:word;y,size:byte;rotation:boolean);
+var
+  dot,a,b,ysize:byte;
+  xsize:word;
+begin
+  if size+x>639 then size:=639-x;
+  if size+y>199 then size:=199-y;
+  xsize:=x+size;
+  ysize:=y+size;
+  case rotation of
+    true:begin
+           for a:=0 to trunc(size/2) do
+           begin
+             for b:=a to size-a-1 do
+             begin
+               dot:=getplot(x+b,y+a);
+               plot(x+b,y+a,getplot(x+a,ysize-b));
+               plot(x+a,ysize-b,getplot(xsize-b,ysize-a));
+               plot(xsize-b,ysize-a,getplot(xsize-a,y+b));
+               plot(xsize-a,y+b,dot);
+             end;
+           end;
+         end;
+    else begin
+           for a:=0 to trunc(size/2) do
+           begin
+             for b:=a to size-a-1 do
+             begin
+               dot:=getplot(x+b,y+a);
+               plot(x+b,y+a,getplot(xsize-a,y+b));
+               plot(xsize-a,y+b,getplot(xsize-b,ysize-a));
+               plot(xsize-b,ysize-a,getplot(x+a,ysize-b));
+               plot(x+a,ysize-b,dot);
+             end;
+           end;
+         end;
+  end;
+end;{rotate}
+
+procedure compress(filename:string;var buf);
+var
+  plotpos:array[0..$f000]of byte absolute buf;
+  pp,cp,lastcp,x,y:word;
+  t,t1,t2:byte;
+  compressed:array[0..$f000]of byte;
+  f:file;
+
+begin
+  cp:=0;
+  pp:=0;
+  repeat
+    if plotpos[pp]=plotpos[pp+1]then
+    begin
+      t:=1;
+      while(plotpos[pp]=plotpos[pp+1])and((t<127)and(pp<$f000))do
+      begin
+        inc(t);
+        inc(pp);
+      end;
+      compressed[cp]:=t;
+      inc(cp);
+      compressed[cp]:=plotpos[pp];
+      inc(cp);
+      inc(pp);
+    end else
+    begin
+      lastcp:=cp;
+      t:=0;
+      while(plotpos[pp]<>plotpos[pp+1])and((t<127)and(pp<$f000))do
+      begin
+        inc(t);
+        inc(cp);
+        compressed[cp]:=plotpos[pp];
+        inc(pp);
+      end;
+      compressed[lastcp]:=$80+t;
+      inc(cp);
+    end;
+  until pp=$f000;
+  assign(f,filename);
+  rewrite(f,1);
+  blockwrite(f,compressed[0],cp);
+  close(f);
+end;{compress}
+
+procedure uncompress(filename:string;var buf);
+var
+  plotpos:array[0..$f800]of byte absolute buf;
+  pp,cp,lastcp,x,y:word;
+  t,t1,t2:byte;
+  compressed:array[0..$f000]of byte;
+  f:file;
+
+begin
+  assign(f,filename);
+  reset(f,1);
+  cp:=filesize(f);
+  blockread(f,compressed[0],cp);
+  close(f);
+  lastcp:=cp;
+  cp:=0;
+  pp:=0;
+  repeat
+    t:=compressed[cp]and $7f;
+    if(compressed[cp]and $80)=0 then
+    begin
+      inc(cp);
+      for x:=1 to t do
+      begin
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end else
+    begin
+      for x:=1 to t do
+      begin
+        inc(cp);
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end;
+  until cp>=lastcp;
+end;{uncompress}
+
+procedure implode(filename:string;var buf);
+var
+  plotpos:array[0..$f000]of byte absolute buf;
+  pp,cp,lastcp,x,y:word;
+  t,t1,t2:byte;
+  compressed:array[0..$f000]of byte;
+  f:file;
+
+begin
+  cp:=0;
+  pp:=0;
+  repeat
+    if(plotpos[pp]=plotpos[pp+1])then
+    begin
+      t1:=1;
+      t2:=0;
+      while(plotpos[pp]=plotpos[pp+1])and((pp<$f000)and(t2<$ff))do
+      begin
+        while(plotpos[pp]=plotpos[pp+1])and((pp<$f000)and(t1<63))do
+        begin
+          inc(t1);
+          inc(pp);
+        end;
+        if(plotpos[pp]=plotpos[pp+1])and((pp<$f000)and(t2<$ff))then
+        begin
+          inc(pp);
+          inc(t2);
+          t1:=1;
+        end;
+      end;
+      if t2>0 then
+      begin
+        compressed[cp]:=64+t1;
+        inc(cp);
+        compressed[cp]:=t2;
+        inc(cp);
+      end else
+      begin
+        compressed[cp]:=t1;
+        inc(cp);
+      end;
+      compressed[cp]:=plotpos[pp];
+      inc(cp);
+      inc(pp);
+    end else
+    begin
+      lastcp:=cp;
+      t:=0;
+      while(plotpos[pp]<>plotpos[pp+1])and((t<127)and(pp<$f000))do
+      begin
+        inc(t);
+        inc(cp);
+        compressed[cp]:=plotpos[pp];
+        inc(pp);
+      end;
+      compressed[lastcp]:=$80+t;
+      inc(cp);
+    end;
+  until pp=$f000;
+  assign(f,filename);
+  rewrite(f,1);
+  blockwrite(f,compressed[0],cp);
+  close(f);
+end;{implode}
+
+procedure explode(filename:string;var buf);
+var
+  plotpos:array[0..$f000]of byte absolute buf;
+  pp,cp,lastcp,x,y:word;
+  t,t1,t2:byte;
+  compressed:array[0..$f000]of byte;
+  f:file;
+
+begin
+  assign(f,filename);
+  reset(f,1);
+  cp:=filesize(f);
+  blockread(f,compressed[0],cp);
+  close(f);
+  lastcp:=cp;
+  cp:=0;
+  pp:=0;
+  repeat
+    t:=compressed[cp]and $7f;
+    t1:=compressed[cp]and $3f;
+    t2:=compressed[cp+1];
+    if(compressed[cp]and $80)=0 then
+    begin
+      if(compressed[cp]and $40)=0 then
+      begin
+        inc(cp);
+        for x:=1 to t1 do
+        begin
+          plotpos[pp]:=compressed[cp];
+          inc(pp);
+        end;
+        inc(cp);
+      end else
+      begin
+        inc(cp,2);
+        y:=(t2 shl 6)+t1-t2;
+        for x:=1 to y do
+        begin
+          plotpos[pp]:=compressed[cp];
+          inc(pp);
+        end;
+        inc(cp);
+      end;
+    end else
+    begin
+      for x:=1 to t do
+      begin
+        inc(cp);
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end;
+  until cp>=lastcp;
+end;{explode}
+
+procedure aload(filename:string;var buf);
+var
+  f:file;
+begin
+  assign(f,filename);
+  reset(f,1);
+  if filesize(f)=$4000 then
+  begin
+    blockread(f,buf,$4000);
+    for a:=0 to 49151 do
+      mem[$b400:a]:=0;
+      close(f);
+  end else if filesize(f)=16392 then
+  begin
+    blockread(f,ptr(seg(buf)-1,9)^,$4000);
+    for a:=0 to 49151 do
+      mem[$b400:a]:=0;
+    close(f);
+  end else if filesize(f)=$8000 then
+  begin
+    blockread(f,buf,$8000);
+    for a:=0 to 32767 do
+      mem[$b800:a]:=0;
+    close(f);
+  end else if filesize(f)=$ffff then
+  begin
+    blockread(f,buf,$ffff);
+    close(f);
+  end else
+  begin
+    close(f);
+    explode(filename,buf);
+  end;
+end;{aload}
+
+procedure enlarge(x,y,size:word);
+var
+  xd,yd,xl,yl,d1,d2,d3,d4:word;
+begin
+  gseg:=$d000;
+  move(ptr($b000,0)^,ptr($d000,0)^,$ffff);
+  clear;
+  d4:=(200 div size)-1;
+  for xl:=0 to(640 div size)-1 do
+  begin
+    d1:=xl*size;
+    d3:=x+xl;
+    for yl:=0 to d4 do
+    begin
+      d2:=yl*size;
+      for xd:=0 to size-1 do
+        for yd:=0 to size-1 do
+          plot(d1+xd,d2+yd,getplot(d3,y+yl));
+    end;
+  end;
+  gseg:=$b000;
+end;{enlarge}
+
+begin
+  pseg:=$b000;
+  gseg:=$b000;
+end.
+
+

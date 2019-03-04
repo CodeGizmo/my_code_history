@@ -1,0 +1,125 @@
+uses crt,printer;
+var size,myofs,fontsize,xinc,
+    xf,yf,xp,yp,linespace,linenum       :word;
+    f                                   :file;
+    filename                            :string;
+    p                                   :pointer;
+
+type myptr=array[0..65000]of byte;
+
+function wtos(w:word):string;
+var s:string;
+    r:byte;
+begin
+  s:='';
+  repeat
+    r:=w mod 10;
+    if w>0 then
+    begin
+      s:=char(r+ord('0'))+s;
+      w:=w div 10;
+    end;
+  until w=0;
+  wtos:=s;
+end;
+
+procedure print;
+var n:word;
+begin
+  xp:=xf; yp:=yf;
+
+  writeln(lst,'/Helvetica findfont');
+  writeln('/Helvetica findfont');
+  writeln(lst,wtos(fontsize),' scalefont setfont');
+  writeln(wtos(fontsize),' scalefont setfont');
+  writeln(lst,wtos(xf),' ',wtos(yf),' moveto');
+  writeln(wtos(xf),' ',wtos(yf),' moveto');
+  repeat
+  repeat
+    write(lst,'(',wtos(linenum):3,']   ');
+    inc(linenum);
+    write('(');
+    while (myptr(p^)[myofs]<>13)and(myofs<size) do
+    begin
+      write(lst,char(myptr(p^)[myofs]));
+      write(char(myptr(p^)[myofs]));
+      inc(myofs);
+    end;
+    inc(myofs,2);
+{    delay(100);}
+    writeln(lst,') show');
+    writeln(') show');
+    yp:=yp-linespace;
+    if (myofs<size)and(yp>=30)then
+    begin
+      writeln(lst,wtos(xp),' ',wtos(yp),' moveto');
+      writeln(wtos(xp),' ',wtos(yp),' moveto');
+    end;
+  until (yp<30+fontsize)or(myofs>=size);
+  yp:=yf;
+  xp:=xp+xinc;
+  until (xp+xinc>580)or(myofs>=size);
+  writeln(lst,'showpage');
+  writeln('showpage');
+end;
+
+procedure print2;
+begin
+  writeln(lst,'/Helvetica findfont');
+  writeln(lst,wtos(fontsize),' scalefont setfont');
+  writeln(lst,wtos(xf),' ',wtos(yf),' moveto');
+  write(lst,'(');
+  write(lst,'Angelo Lian Lanuza');
+  writeln(lst,') show');
+  writeln(lst,wtos(xp),' ',wtos(yp),' moveto');
+  writeln(lst,'showpage');
+end;
+
+procedure pinit;
+begin
+  xf:=30;
+  xp:=xf;
+  yf:=758;
+  yp:=yf;
+  myofs:=0;
+  fontsize:=2;
+  linespace:=fontsize;
+  linenum:=1;
+  xinc:=45*fontsize;
+end;
+
+procedure load(filename:string);
+begin
+  assign(f,filename);
+  reset(f,1);
+  size:=filesize(f);
+  blockread(f,p^,size);
+  close(f);
+end;
+
+begin
+
+  getmem(p,65535);
+  filename:={'e:\angelo\newest\rolfazil.pas'}'e:\angelo\newest\vgaliza3.pas';
+  load(filename);
+  pinit;
+  print;
+  writeln(fontsize);
+  readln;
+end.
+
+(*/Helvetica-Bold findfont
+10 scalefont
+setfont
+1 setlinewidth
+%%.1 .1 translate
+0 .03 1 {setgray
+%%.1 .1 translate
+1.01 1.01 scale
+50 200 moveto
+(Angelo Lian Lanuza) show
+} for
+0 setgray
+50 200 moveto
+(Angelo Lian Lanuza) show
+showpage*)

@@ -1,0 +1,671 @@
+unit graphall;
+interface
+uses graph,dos;
+var
+  gd,gm,pg,a,b,maxx                :integer;
+  linet,drawing,picture,picture2   :pointer;
+  l,r,s                            :word;
+  f                                :file;
+  astatus,c                        :byte;
+  iocode,aamode                    :boolean;
+  xs                               :array[1..$2000]of word;
+  ys                               :array[1..$2000]of byte;
+  z0:array[0..99,0..79]of byte absolute $b800:0;
+  z1:array[0..99,0..79]of byte absolute $ba00:0;
+  z2:array[0..99,0..79]of byte absolute $bc00:0;
+  z3:array[0..99,0..79]of byte absolute $be00:0;
+  compressed:array[0..$8150]of byte;
+  pp,cp,lastcp,x,y:word;
+  t,t1,t2:byte;
+
+procedure clear;
+procedure graphmode(amode:byte);
+procedure plot(x:word;y,c:byte);
+function  getplot(x,y:word):byte;
+procedure fillplate(x,y:integer;pc:byte);
+procedure flipvert;
+procedure fliphoriz;
+procedure flipvertical(x1,y1,x2,y2:word);
+procedure fliphorizontal(x1,y1,x2,y2:word);
+procedure asave(filename:string);
+procedure psave(filename:string);
+procedure aload(filename:string);
+procedure rotate(x:word;y,size:byte;rotation:boolean);
+procedure compress(filename:string;var bufpos);
+procedure uncompress(filename:string;var bufpos);
+procedure implode(filename:string;var bufpos);
+procedure explode(filename:string;var bufpos);
+
+implementation
+
+procedure initialize;
+begin
+  gd:=detect;
+  detectgraph(gd,gm);
+  initgraph(gd,gm,'');
+  setgraphmode(cgac0);
+  getmem(drawing,$8000);
+  getmem(linet,80);
+  move(ptr($FFFF,0)^,drawing^,$8000);
+  pg:=0;
+  maxx:=319;
+  getmem(picture,16384);
+  getmem(picture2,16384);
+  aamode:=false;
+end;{initialize}
+
+procedure clear;
+begin
+  for a:=0 to $4000 do
+    memw[$b800:a*2]:=0;
+end;{clear}
+
+procedure graphmode(amode:byte);
+begin
+  if(amode mod 2)=0 then aamode:=false else aamode:=true;
+  if(mem[$40:$49]mod 8)=5 then move(ptr($b800,0)^,drawing^,$8000)else setgraphmode(cgac0);
+  if aamode then
+  begin
+    port[$3dd]:=32;
+    maxx:=639;
+  end else
+  begin
+    port[$3dd]:=16;
+    maxx:=319;
+  end;
+  if(mem[$40:$49]mod 8)=5 then move(drawing^,ptr($b800,0)^,$8000);
+end;{graphmode}
+
+procedure plot(x:word;y,c:byte);
+begin
+  if(x<maxx+1)and(y<200)then
+  if aamode then
+  begin
+    c:=c mod 4;
+    a:=$80 shr(x mod 8);
+    b:=not(a);
+    if odd(y) then
+    begin
+      if odd(c mod 2) then z1[y shr 1,x shr 3]:=z1[y shr 1,x shr 3]or a else
+                           z1[y shr 1,x shr 3]:=z1[y shr 1,x shr 3]and b;
+      if odd(c div 2) then z3[y shr 1,x shr 3]:=z3[y shr 1,x shr 3]or a else
+                           z3[y shr 1,x shr 3]:=z3[y shr 1,x shr 3]and b;
+    end else
+    begin
+      if odd(c mod 2) then z0[y shr 1,x shr 3]:=z0[y shr 1,x shr 3]or a else
+                           z0[y shr 1,x shr 3]:=z0[y shr 1,x shr 3]and b;
+      if odd(c div 2) then z2[y shr 1,x shr 3]:=z2[y shr 1,x shr 3]or a else
+                           z2[y shr 1,x shr 3]:=z2[y shr 1,x shr 3]and b;
+    end;
+  end else
+  begin
+    c:=c mod 16;
+    case(x mod 4)of
+      0:begin a:=$40;b:=$3f end;
+      1:begin a:=$10;b:=$cf end;
+      2:begin a:=4;b:=$f3 end;
+      3:begin a:=1;b:=$fc end;
+    end;
+    if odd(y) then
+    begin
+      z1[y shr 1,x shr 2]:=(z1[y shr 1,x shr 2]and b)or((c mod 4)*a);
+      z3[y shr 1,x shr 2]:=(z3[y shr 1,x shr 2]and b)or((c shr 2)*a);
+    end else
+    begin
+      z0[y shr 1,x shr 2]:=(z0[y shr 1,x shr 2]and b)or((c mod 4)*a);
+      z2[y shr 1,x shr 2]:=(z2[y shr 1,x shr 2]and b)or((c shr 2)*a);
+    end;
+  end;
+end;{plot}
+
+function getplot(x,y:word):byte;
+begin
+  if aamode then
+  begin
+    case(x mod 8)of
+      0:a:=128;
+      1:a:=64;
+      2:a:=32;
+      3:a:=16;
+      4:a:=8;
+      5:a:=4;
+      6:a:=2;
+      7:a:=1;
+    end;
+    case(y and 1)of
+      0:getplot:=((mem[$b800:(y*40)+(x div 4)]and(a*3))div a)
+                +(((mem[$bc00:(y*40)+(x div 4)]and(a*3))div a)*2);
+      else getplot:=((mem[$ba00:(y*40)+(x div 4)-40]and(a*3))div a)
+                +(((mem[$be00:(y*40)+(x div 4)-40]and(a*3))div a)*2);
+    end;
+  end else
+  begin
+    case(x mod 4)of
+      0:a:=64;
+      1:a:=16;
+      2:a:=4;
+      3:a:=1;
+    end;
+    case(y and 1)of
+      0:getplot:=((mem[$b800:(y*40)+(x div 4)]and(a*3))div a)
+                +(((mem[$bc00:(y*40)+(x div 4)]and(a*3))div a)*4);
+      else getplot:=((mem[$ba00:(y*40)+(x div 4)-40]and(a*3))div a)
+                +(((mem[$be00:(y*40)+(x div 4)-40]and(a*3))div a)*4);
+    end;
+  end;
+end;{getplot}
+
+procedure fillplate(x,y:integer;pc:byte);
+begin
+  s:=0;
+  c:=getplot(x,y)mod 16;
+  pc:=pc mod 16;
+  if not(c=pc)then
+  begin
+    plot(x,y,pc);
+    inc(s);xs[s]:=x;ys[s]:=y;
+    inc(s);xs[s]:=x;ys[s]:=y;
+    inc(s);xs[s]:=x;ys[s]:=y;
+    if(getplot(x,y-1)=c)and(y<>0)then dec(y)
+    else if(getplot(x-1,y)=c)and(x<>0)then dec(x)
+    else if(getplot(x,y+1)=c)and(y<>199)then inc(y)
+    else if(getplot(x+1,y)=c)and(x<>maxx)then inc(x);
+    plot(x,y,pc);
+    repeat
+      repeat
+        while((getplot(x-1,y)=c)and((getplot(x,y-1)<>c)or(y=0)))and(x>0)do
+        begin
+          if getplot(x-1,y+1)<>c then if getplot(x,y+1)=c then
+          begin
+            inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x+1,y)=c then
+            if(getplot(x+1,y+1)<>c)or(y=199)or(getplot(x,y+1)<>c)then
+            begin
+              inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          dec(x);
+          plot(x,y,pc);
+        end;
+        while((getplot(x,y-1)=c)and((getplot(x+1,y)<>c)or(x=maxx)))and(y>0)do
+        begin
+          if getplot(x-1,y-1)<>c then if getplot(x-1,y)=c then
+          begin
+            inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x,y+1)=c then
+            if(getplot(x-1,y+1)<>c)or(x=0)or(getplot(x-1,y)<>c) then
+            begin
+              inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          dec(y);
+          plot(x,y,pc);
+        end;
+        while((getplot(x+1,y)=c)and((getplot(x,y+1)<>c)or(y=199)))and(x+1<=319)do
+        begin
+          if getplot(x+1,y-1)<>c then if getplot(x,y-1)=c then
+          begin
+            inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x-1,y)=c then
+            if(getplot(x-1,y-1)<>c)or(y=0)or(getplot(x,y-1)<>c)then
+            begin
+              inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          inc(x);
+          plot(x,y,pc);
+        end;
+        while((getplot(x,y+1)=c)and((getplot(x-1,y)<>c)or(x=0)))and(y+1<=199)do
+        begin
+          if getplot(x+1,y+1)<>c then if getplot(x+1,y)=c then
+          begin
+            inc(s);
+            xs[s]:=x;
+            ys[s]:=y;
+          end;
+          if getplot(x,y-1)=c then
+            if(getplot(x+1,y-1)<>c)or(x=319)or(getplot(x+1,y)<>c)then
+            begin
+              inc(s);
+              xs[s]:=x;
+              ys[s]:=y;
+            end;
+          inc(y);
+          plot(x,y,pc);
+        end;
+      until(((getplot(x-1,y)<>c)or(x=0))and((getplot(x,y-1)<>c)or(y=0)))
+            and(((getplot(x+1,y)<>c)or(x=maxx))
+            and((getplot(x,y+1)<>c)or(y=199)));
+      x:=xs[s];
+      y:=ys[s];
+      dec(s);
+    until s<=0;
+  end;
+end;{fillplate}
+
+procedure flipvert;
+begin
+  for a:=0 to 99 do
+  begin
+    b:=199-a;
+    move(ptr($b800,a*80)^,linet^,80);
+    move(ptr($b800,16112-a*80)^,ptr($b800,a*80)^,80);
+    move(linet^,ptr($b800,16112-a*80)^,80);
+    move(ptr($bc00,a*80)^,linet^,80);
+    move(ptr($bc00,16112-a*80)^,ptr($bc00,a*80)^,80);
+    move(linet^,ptr($bc00,16112-a*80)^,80);
+  end;
+end;{flipvert}
+
+procedure fliphoriz;
+begin
+  for a:=0 to 99 do
+    for b:=0 to 19 do
+    begin
+      l:=memw[$b800:a*80+b*2];
+      r:=memw[$b800:a*80+78-b*2];
+      memw[$b800:a*80+b*2]:=swap((((r shl 6)and $c0c0)xor((r shr 6)and $303))xor
+                                 (((r shl 2)and $3030)xor((r shr 2)and $c0c)));
+      memw[$b800:a*80+78-b*2]:=swap((((l shl 6)and $c0c0)xor((l shr 6)and $303))xor
+                                    (((l shl 2)and $3030)xor((l shr 2)and $c0c)));
+      l:=memw[$b800:16112-a*80+b*2];
+      r:=memw[$b800:16190-a*80-b*2];
+      memw[$b800:16112-a*80+b*2]:=swap((((r shl 6)and $c0c0)xor((r shr 6)and $303))xor
+                                       (((r shl 2)and $3030)xor((r shr 2)and $c0c)));
+      memw[$b800:16190-a*80-b*2]:=swap((((l shl 6)and $c0c0)xor((l shr 6)and $303))xor
+                                       (((l shl 2)and $3030)xor((l shr 2)and $c0c)));
+      l:=memw[$bc00:a*80+b*2];
+      r:=memw[$bc00:a*80+78-b*2];
+      memw[$bc00:a*80+b*2]:=swap((((r shl 6)and $c0c0)xor((r shr 6)and $303))xor
+                                 (((r shl 2)and $3030)xor((r shr 2)and $c0c)));
+      memw[$bc00:a*80+78-b*2]:=swap((((l shl 6)and $c0c0)xor((l shr 6)and $303))xor
+                                    (((l shl 2)and $3030)xor((l shr 2)and $c0c)));
+      l:=memw[$bc00:16112-a*80+b*2];
+      r:=memw[$bc00:16190-a*80-b*2];
+      memw[$bc00:16112-a*80+b*2]:=swap((((r shl 6)and $c0c0)xor((r shr 6)and $303))xor
+                                       (((r shl 2)and $3030)xor((r shr 2)and $c0c)));
+      memw[$bc00:16190-a*80-b*2]:=swap((((l shl 6)and $c0c0)xor((l shr 6)and $303))xor
+                                       (((l shl 2)and $3030)xor((l shr 2)and $c0c)));
+    end;
+end;{fliphoriz}
+
+procedure flipvertical(x1,y1,x2,y2:word);
+begin
+  getimage(x1,y1,x2,y2,picture^);
+  move(ptr($b800,0)^,ptr($d000,0)^,$4000);
+  move(ptr($bc00,0)^,ptr($b800,0)^,$4000);
+  getimage(x1,y1,x2,y2,picture2^);
+  move(ptr($d000,0)^,ptr($b800,0)^,$4000);
+  flipvert;
+  move(ptr($b800,0)^,ptr($d000,0)^,$4000);
+  move(ptr($bc00,0)^,ptr($b800,0)^,$4000);
+  putimage(x1,199-y2,picture2^,normalput);
+  move(ptr($b800,0)^,ptr($bc00,0)^,$4000);
+  move(ptr($d000,0)^,ptr($b800,0)^,$4000);
+  putimage(x1,199-y2,picture^,normalput);
+  flipvert;
+end;{flipvertical}
+
+procedure fliphorizontal(x1,y1,x2,y2:word);
+begin
+  getimage(x1,y1,x2,y2,picture^);
+  move(ptr($b800,0)^,ptr($d000,0)^,$4000);
+  move(ptr($bc00,0)^,ptr($b800,0)^,$4000);
+  getimage(x1,y1,x2,y2,picture2^);
+  move(ptr($d000,0)^,ptr($b800,0)^,$4000);
+  fliphoriz;
+  move(ptr($b800,0)^,ptr($d000,0)^,$4000);
+  move(ptr($bc00,0)^,ptr($b800,0)^,$4000);
+  putimage(maxx-x2,y1,picture2^,normalput);
+  move(ptr($b800,0)^,ptr($bc00,0)^,$4000);
+  move(ptr($d000,0)^,ptr($b800,0)^,$4000);
+  putimage(maxx-x2,y1,picture^,normalput);
+  fliphoriz;
+end;{fliphorizontal}
+
+procedure rotate(x:word;y,size:byte;rotation:boolean);
+var
+  dot,a,b,ysize:byte;
+  xsize:word;
+begin
+  if size+x>319 then size:=319-x;
+  if size+y>199 then size:=199-y;
+  xsize:=x+size;
+  ysize:=y+size;
+  case rotation of
+    true:begin
+           for a:=0 to trunc(size/2) do
+           begin
+             for b:=a to size-a-1 do
+             begin
+               dot:=getplot(x+b,y+a);
+               plot(x+b,y+a,getplot(x+a,ysize-b));
+               plot(x+a,ysize-b,getplot(xsize-b,ysize-a));
+               plot(xsize-b,ysize-a,getplot(xsize-a,y+b));
+               plot(xsize-a,y+b,dot);
+             end;
+           end;
+         end;
+    else begin
+           for a:=0 to trunc(size/2) do
+           begin
+             for b:=a to size-a-1 do
+             begin
+               dot:=getplot(x+b,y+a);
+               plot(x+b,y+a,getplot(xsize-a,y+b));
+               plot(xsize-a,y+b,getplot(xsize-b,ysize-a));
+               plot(xsize-b,ysize-a,getplot(x+a,ysize-b));
+               plot(x+a,ysize-b,dot);
+             end;
+           end;
+         end;
+  end;
+end;{rotate}
+
+procedure asave(filename:string);
+begin
+  assign(f,filename);
+  {$I-}
+  rewrite(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    if diskfree(0)<cp+1 then astatus:=2 else
+    begin
+      blockwrite(f,drawing^,$8000);
+      astatus:=0;
+    end;
+    close(f);
+  end else astatus:=1;
+end;{asave}
+
+procedure psave(filename:string);
+begin
+  assign(f,filename);
+  {$I-}
+  rewrite(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    if diskfree(0)<$4000 then astatus:=2 else
+    begin
+      blockwrite(f,drawing^,$4000);
+      astatus:=0;
+    end;
+    close(f);
+  end else astatus:=1;
+end;{psave}
+
+procedure compress(filename:string;var bufpos);
+var
+  plotpos:array[0..$8000]of byte absolute bufpos;
+
+begin
+  cp:=0;
+  pp:=0;
+  repeat
+    if plotpos[pp]=plotpos[pp+1]then
+    begin
+      t:=1;
+      while(plotpos[pp]=plotpos[pp+1])and((t<127)and(pp<$8000))do
+      begin
+        inc(t);
+        inc(pp);
+      end;
+      compressed[cp]:=t;
+      inc(cp);
+      compressed[cp]:=plotpos[pp];
+      inc(cp);
+      inc(pp);
+    end else
+    begin
+      lastcp:=cp;
+      t:=0;
+      while(plotpos[pp]<>plotpos[pp+1])and((t<127)and(pp<$8000))do
+      begin
+        inc(t);
+        inc(cp);
+        compressed[cp]:=plotpos[pp];
+        inc(pp);
+      end;
+      compressed[lastcp]:=$80+t;
+      inc(cp);
+    end;
+  until pp=$8000;
+  assign(f,filename);
+  {$I-}
+  rewrite(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    if diskfree(0)<cp then astatus:=2 else
+    begin
+      blockwrite(f,compressed[0],cp);
+      astatus:=0;
+    end;
+    close(f);
+  end else astatus:=1;
+end;{compress}
+
+procedure uncompress(filename:string;var bufpos);
+var
+  plotpos:array[0..$8000]of byte absolute bufpos;
+
+begin
+  assign(f,filename);
+  {$I-}
+  reset(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    cp:=filesize(f);
+    blockread(f,compressed[0],cp);
+    close(f);
+    astatus:=0;
+  end else astatus:=1;
+  lastcp:=cp;
+  cp:=0;
+  pp:=0;
+  repeat
+    t:=compressed[cp]and $7f;
+    if(compressed[cp]and $80)=0 then
+    begin
+      inc(cp);
+      for x:=1 to t do
+      begin
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end else
+    begin
+      for x:=1 to t do
+      begin
+        inc(cp);
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end;
+  until cp>=lastcp;
+end;{uncompress}
+
+procedure implode(filename:string;var bufpos);
+var
+  plotpos:array[0..$8000]of byte absolute bufpos;
+
+begin
+  cp:=0;
+  pp:=0;
+  repeat
+    if(plotpos[pp]=plotpos[pp+1])then
+    begin
+      t1:=1;
+      t2:=0;
+      while(plotpos[pp]=plotpos[pp+1])and((pp<$8000)and(t2<$ff))do
+      begin
+        while(plotpos[pp]=plotpos[pp+1])and((pp<$8000)and(t1<63))do
+        begin
+          inc(t1);
+          inc(pp);
+        end;
+        if(plotpos[pp]=plotpos[pp+1])and((pp<$8000)and(t2<$ff))then
+        begin
+          inc(pp);
+          inc(t2);
+          t1:=1;
+        end;
+      end;
+      if t2>0 then
+      begin
+        compressed[cp]:=64+t1;
+        inc(cp);
+        compressed[cp]:=t2;
+        inc(cp);
+      end else
+      begin
+        compressed[cp]:=t1;
+        inc(cp);
+      end;
+      compressed[cp]:=plotpos[pp];
+      inc(cp);
+      inc(pp);
+    end else
+    begin
+      lastcp:=cp;
+      t:=0;
+      while(plotpos[pp]<>plotpos[pp+1])and((t<127)and(pp<$8000))do
+      begin
+        inc(t);
+        inc(cp);
+        compressed[cp]:=plotpos[pp];
+        inc(pp);
+      end;
+      compressed[lastcp]:=$80+t;
+      inc(cp);
+    end;
+  until pp=$8000;
+  assign(f,filename);
+  {$I-}
+  rewrite(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    if diskfree(0)<cp then astatus:=2 else
+    begin
+      blockwrite(f,compressed[0],cp);
+      astatus:=0;
+    end;
+    close(f);
+  end else astatus:=1;
+end;{implode}
+
+procedure explode(filename:string;var bufpos);
+var
+  plotpos:array[0..$8000]of byte absolute bufpos;
+
+begin
+  assign(f,filename);
+  {$I-}
+  reset(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    cp:=filesize(f);
+    blockread(f,compressed[0],cp);
+    close(f);
+    astatus:=0;
+  end else astatus:=1;
+  lastcp:=cp;
+  cp:=0;
+  pp:=0;
+  repeat
+    t:=compressed[cp]and $7f;
+    t1:=compressed[cp]and $3f;
+    t2:=compressed[cp+1];
+    if(compressed[cp]and $80)=0 then
+    begin
+      if(compressed[cp]and $40)=0 then
+      begin
+        inc(cp);
+        for x:=1 to t1 do
+        begin
+          plotpos[pp]:=compressed[cp];
+          inc(pp);
+        end;
+        inc(cp);
+      end else
+      begin
+        inc(cp,2);
+        y:=(t2 shl 6)+t1-t2;
+        for x:=1 to y do
+        begin
+          plotpos[pp]:=compressed[cp];
+          inc(pp);
+        end;
+        inc(cp);
+      end;
+    end else
+    begin
+      for x:=1 to t do
+      begin
+        inc(cp);
+        plotpos[pp]:=compressed[cp];
+        inc(pp);
+      end;
+      inc(cp);
+    end;
+  until cp>=lastcp;
+end;{explode}
+
+procedure aload(filename:string);
+begin
+  assign(f,filename);
+  {$I-}
+  reset(f,1);
+  {$I+}
+  if ioresult=0 then
+  begin
+    if filesize(f)=$4000 then begin
+      blockread(f,ptr($d000,0)^,$4000);
+      for a:=0 to 16383 do
+        mem[$d400:a]:=0;
+      move(ptr($d000,0)^,drawing^,$8000);
+      close(f);
+    end else if filesize(f)=16392 then
+    begin
+      blockread(f,ptr($cfff,9)^,$4000);
+      for a:=0 to 16383 do
+        mem[$d400:a]:=0;
+      move(ptr($d000,0)^,drawing^,$8000);
+      close(f);
+    end else if filesize(f)=$8000 then
+    begin
+      blockread(f,drawing^,$8000);
+      close(f);
+    end else
+    begin
+      close(f);
+      explode(filename,drawing^);
+    end;
+    astatus:=0;
+  end else astatus:=1;
+end;{aload}
+
+begin
+  initialize;
+  restorecrtmode;
+end.
+

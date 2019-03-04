@@ -1,0 +1,18 @@
+67108864 loops in  7.03 Sec.
+Loop rate is  9546068.85 loops per Sec.
+67108864 nops in  3.07 Sec.
+Loop rate is 21859564.82 loops per Sec.
+67108864 muls in 13.08 Sec.
+Loop rate is  5130647.09 loops per Sec.
+67108864 movs in  1.04 Sec.
+Loop rate is 64527753.85 loops per Sec.
+67108864 memmovs in  1.04 Sec.
+Loop rate is 64527753.85 loops per Sec.
+67107840 byte transfered in  8.35 Sec.
+byte transfer rate is  8036867.07 bytes per Sec.
+67107840 byte transfered in  5.33 Sec.
+Word transfer rate is 12590397.00 bytes per Sec.
+67107840 bytes stored in  6.15 Sec.
+Store rate is 10912010.41 bytes per Sec.
+67107840 bytes loaded in  5.28 Sec.
+Load transfer rate is 12710012.12 bytes per Sec.

@@ -1,0 +1,10 @@
+var
+  b:byte;
+  c:integer;
+  w:word;
+begin
+  val(paramstr(1),w,c);
+  port[$43]:=$76;
+  port[$41]:=lo(w);
+  port[$41]:=hi(w);
+end.

@@ -1,0 +1,335 @@
+uses crt,vgaliza3,rolfazil;
+(*var
+  buncom,bcom   :longint;
+  com,uncom     :longint;
+  compresssize,
+  upos,cpos     :word;
+  showcompleted :boolean;      {maybe temp}
+  every:word;
+type
+  myptr=array[0..65530]of byte;
+  wordptr=array[0..32766]of word;
+
+var
+  maxindexf,maxindexm,maxindex,
+  countest,indexest,
+  index,count,maxcount,ncount :byte;
+  lupos:word;{temporary}
+
+  var
+    abc                   :byte;
+    ndexs                 :word;
+  var
+    abcpos                :pointer;
+    lastindex             :byte;
+
+
+procedure slidec2(var bufin,bufout;usize:word;cbits:byte);
+var
+  start           :array[0..255]of word;
+  max,chars,head  :array[0..255]of word;
+
+      procedure initialize;
+      var
+        i:word;
+        lmax:word;
+      begin
+        getmem(abcpos,maxindexf*2+256);
+        for i:=0 to 255 do
+          max[i]:=0;
+        for i:=0 to usize-1 do
+          inc(max[myptr(bufin)[i]]);
+        for i:=0 to 255 do
+        begin
+          lmax:=max[i];;
+          max[i]:=max[i]*longint(maxindexf)*2 div usize;
+          if (max[i]=0)and(lmax>0)then max[i]:=1;
+          chars[i]:=0;
+          head[i]:=0;
+        end;
+        start[0]:=0;
+        for i:=1 to 255 do
+          start[i]:=start[i-1]+max[i-1];
+      end;
+
+  procedure uninit;
+  begin
+    freemem(abcpos,maxindexf*2+256);
+  end;
+  procedure search_match;
+
+  begin
+    ABC:=myptr(bufin)[upos];
+    countest:=1;
+    if chars[ABC]>0 then
+    begin
+      if chars[ABC]>max[ABC]then
+      begin
+        index:=0;
+        for ndexs:=0 to max[abc]-1 do
+        begin
+          lastindex:=index;
+          index:=upos-wordptr(abcpos^)[start[abc]+((head[abc]+max[abc]-ndexs)mod max[abc])]-1;
+          if (index)>maxindex then
+          begin
+            if ndexs>0 then index:=lastindex else exit;
+          end;
+{          if myptr(bufin)[upos-1-index]<>myptr(bufin)[upos]then
+          begin
+            write('NOT A MATCH!');
+            readkey;
+          end;     }
+          count:=0;
+          while(myptr(bufin)[upos-1-index+count]=myptr(bufin)[upos+count])
+               and(count<=maxcount)and(upos+count<=usize)do inc(count);
+          if count>countest then
+          begin
+            countest:=count;
+            indexest:=index;
+            if countest>maxcount then exit;
+          end;
+        end;
+{        index:=0;}
+        repeat
+          count:=0;
+          while(myptr(bufin)[upos-1-index+count]=myptr(bufin)[upos+count])
+               and(count<=maxcount)and(upos+count<=usize)do inc(count);
+          if count>countest then
+          begin
+            countest:=count;
+            indexest:=index;
+            if countest>maxcount then exit;
+          end;
+          inc(index);
+        until(index>maxindex)or(index>=upos)or(upos+countest>usize);
+      end else
+      begin
+        for ndexs:=0 to chars[abc]-1 do
+        begin
+          lastindex:=index;
+          index:=upos-wordptr(abcpos^)[start[abc]+((head[abc]-ndexs)mod max[abc])]-1;
+          if index>maxindex then
+          begin
+            if ndexs>0 then index:=lastindex else exit;
+          end;
+          count:=0;
+          while(myptr(bufin)[upos-1-index+count]=myptr(bufin)[upos+count])
+               and(count<=maxcount)and(upos+count<=usize)do inc(count);
+          if count>countest then
+          begin
+            countest:=count;
+            indexest:=index;
+            if countest>maxcount then exit;
+          end;
+        end;
+      end;
+    end;
+  end;{search_match}
+
+  procedure savenomatch;
+  begin
+    myptr(bufout)[cpos]:=127+ncount;
+    inc(cpos);
+    move(myptr(bufin)[upos-ncount],myptr(bufout)[cpos],ncount);
+    cpos:=cpos+ncount;
+  end;{savenomatch}
+
+  procedure moving;
+  begin
+    abc:=myptr(bufin)[upos];
+
+    head[abc]:=(head[abc]+1)mod max[abc];
+    inc(chars[abc]);
+    wordptr(abcpos^)[start[abc]+head[abc]]:=upos;
+    if (upos-maxindexf)>0 then dec(chars[myptr(bufin)[upos-maxindexf-1]]);
+  end;
+
+begin
+  uncom:=usize;
+  dec(usize);
+  myptr(bufout)[0]:=3;
+  myptr(bufout)[1]:=lo(usize);
+  myptr(bufout)[2]:=hi(usize);
+  myptr(bufout)[5]:=cbits;
+  myptr(bufout)[6]:=myptr(bufin)[0];
+  maxcount:=1 shl cbits;
+  maxindexf:=(1 shl(8-cbits))-1;
+  maxindexm:=(1 shl(7-cbits))-1;
+  ncount:=0;
+  maxindex:=maxindexm;
+  initialize;
+  cpos:=7;
+  upos:=0;
+  moving;
+  inc(upos);
+  lupos:=upos;{temp}
+  repeat
+    search_match;
+    if countest>1 then
+    begin
+      if ncount>0 then
+      begin
+        savenomatch;
+        ncount:=0;
+      end;
+      myptr(bufout)[cpos]:=(indexest shl cbits)+countest-2;
+      maxindex:=maxindexm;
+      inc(cpos);
+      for upos:=upos to upos+countest-1 do
+      begin
+        moving;
+{        inc(upos);}
+      end;
+      inc(upos);
+{      upos:=upos+countest;}
+    end else
+    begin
+      maxindex:=maxindexf;
+      inc(ncount);
+      moving;
+      inc(upos);
+      if ncount>127 then
+      begin
+        savenomatch;
+        ncount:=0;
+        maxindex:=maxindexm;
+      end;
+    end;                {maybe temp}
+  until upos>usize;
+  if ncount>0 then savenomatch;
+  myptr(bufout)[3]:=lo(cpos);
+  myptr(bufout)[4]:=hi(cpos);
+  compresssize:=cpos;
+  uninit;
+end;{slidec2}*)
+
+var wcountest,wcount,
+    windexest,windex,
+    wmaxindex,wmaxindexf,wmaxindexm,
+    wncount,
+    wmaxcount,
+    myword
+    :word;
+    myc:word;
+procedure slidewc(var bufin,bufout;usize:word;cbits:byte);
+
+  procedure search_match;
+  begin
+    wcountest:=2;
+    windex:=0;
+    repeat
+      wcount:=0;
+      while(myptr(bufin)[upos-1-windex+wcount]=myptr(bufin)[upos+wcount])
+           and(wcount<=wmaxcount)and(upos+wcount<=usize)do inc(wcount);
+      if wcount>wcountest then
+      begin
+        wcountest:=wcount;
+        windexest:=windex;
+        if wcountest>wmaxcount then exit;
+      end;
+      inc(windex);
+    until(windex>wmaxindex)or(windex>=upos)or(upos+wcountest>usize);
+  end;{search_match}
+
+  procedure savenomatch;
+  begin
+    myptr(bufout)[cpos]:=127+wncount;
+    inc(cpos);
+    move(myptr(bufin)[upos-wncount],myptr(bufout)[cpos],wncount);
+    cpos:=cpos+wncount;
+  end;{savenomatch}
+
+begin
+  myc:=0;
+  uncom:=usize;
+  dec(usize);
+  myptr(bufout)[0]:=4;
+  myptr(bufout)[1]:=lo(usize);
+  myptr(bufout)[2]:=hi(usize);
+  myptr(bufout)[5]:=cbits;
+  myptr(bufout)[6]:=myptr(bufin)[0];
+  cpos:=7;
+  upos:=1;
+  wmaxcount:=(1 shl cbits)+1;
+  wmaxindexf:=(1 shl(16-cbits))-1;
+  wmaxindexm:=(1 shl(15-cbits))-1;
+  wncount:=0;
+  wmaxindex:=wmaxindexm;
+  {lupos:=upos;{temp}
+  repeat
+    search_match;
+    if wcountest>2 then
+    begin
+      if wncount>0 then
+      begin
+        myc:=myc+wncount;
+        savenomatch;
+        wncount:=0;
+      end;
+      myword:=(windexest shl cbits)+wcountest-3;
+      myptr(bufout)[cpos]:=hi(myword);
+      inc(cpos);
+      myptr(bufout)[cpos]:=lo(myword);
+      inc(cpos);
+      wmaxindex:=wmaxindexm;
+      upos:=upos+wcountest;
+    end else
+    begin
+      wmaxindex:=wmaxindexf;
+      inc(wncount);
+      inc(upos);
+      if wncount>127 then
+      begin
+        myc:=myc+wncount;
+        savenomatch;
+        wncount:=0;
+        wmaxindex:=wmaxindexm;
+      end;
+    end;                    {maybe temp}
+{    if (showcompleted)and(lupos+every<upos)then
+    begin
+      gotoxy(1,23);
+      writeln('Estimated compression: ',cpos/upos*100:3:3,'%');
+      write('Percent Completed: ',upos/usize*100:3:3,'%');
+      lupos:=upos
+    end;}
+  until upos>usize;
+  writeln('Total myc:=',myc:6);
+  readkey;
+  if wncount>0 then savenomatch;
+  myptr(bufout)[3]:=lo(cpos);
+  myptr(bufout)[4]:=hi(cpos);
+  compresssize:=cpos;
+end;{slidewc}
+
+
+var
+  p,p2:pointer;
+  ch:char;
+  t:word;
+  c:array[0..255]of boolean;
+  x:word;
+begin
+  directvideo:=false;
+  vgamode(1);
+  getmem(p,65000);
+  getmem(p2,65000);
+  aload('e:\angelo\newest\pictures\newbunny.liz',p^);
+  uncompress(p^,ptr($a000,0)^);
+  for t:=0 to 255 do c[t]:=false;
+  for t:=0 to 63999 do c[myptr(ptr($a000,0)^)[t]]:=true;
+  x:=0;
+  for t:=0 to 255 do if c[t] then inc(x);
+  writeln('total:=',x:4);
+  readkey;
+
+  move(ptr($a000,0)^,p2^,64000);
+    slidewc(p2^,ptr($a000,0)^,64000,5);
+{    move(ptr($a000,0)^,p2^,compresssize);}
+    writeln(compresssize:6);
+    readkey;
+{    slidec(p2^,ptr($a000,0)^,compresssize,2);
+    write(compresssize);
+    ch:=readkey;         }
+  readkey;
+end.

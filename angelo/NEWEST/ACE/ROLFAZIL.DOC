@@ -1,0 +1,27 @@
+{A compression unit}
+{Programmed (from scratch) by: Angelo Lian Lanuza}
+{Address: 234 Purple Rd., Canaynay Court Subd., Las Pinas, Metro Manila, Phils}
+unit rolfazil;
+interface
+  compresssize {this holds the value of the compressed size result}
+               {use this variable to check for the resulting compressed size}
+               :word;
+
+{A procedure ending with c means to compress, while ending
+      with u to uncompress}
+procedure huffmanc(var bufin,bufout;unhuffsize:word);
+
+procedure huffmanu(var bufin,bufout);
+
+procedure slidec(var bufin,bufout;usize:word;cbits:byte);
+          {cbits can have a range from 1 to 7}
+
+procedure slideu(var bufin,bufout);
+
+procedure slidewc(var bufin,bufout;usize:word;cbits:byte);
+          {cbits can have a range from 1 to 15}
+
+procedure slidewu(var bufin,bufout);
+
+implementation
+{Available only from me, OK!}

@@ -1,0 +1,1661 @@
+/***********************************************************
+	ar.c -- main file
+***********************************************************/
+
+static char *usage =
+	"ar -- compression archiver -- written by Haruhiko Okumura\n"
+	"  PC-VAN:SCIENCE        CompuServe:74050,1022\n"
+	"  NIFTY-Serve:PAF01022  INTERNET:74050.1022@compuserve.com\n"
+	"Usage: ar command archive [file ...]\n"
+	"Commands:\n"
+	"   a: Add files to archive (replace if present)\n"
+	"   x: Extract files from archive\n"
+	"   r: Replace files in archive\n"
+	"   d: Delete files from archive\n"
+	"   p: Print files on standard output\n"
+	"   l: List contents of archive\n"
+	"If no files are named, all files in archive are processed,\n"
+	"   except for commands 'a' and 'd'.\n"
+	"You may copy, distribute, and rewrite this program freely.\n";
+
+/***********************************************************
+
+Structure of archive block (low order byte first):
+-----preheader
+ 1	basic header size
+		= 25 + strlen(filename) (= 0 if end of archive)
+ 1	basic header algebraic sum (mod 256)
+-----basic header
+ 5	method ("-lh0-" = stored, "-lh5-" = compressed)
+ 4	compressed size (including extended headers)
+ 4	original size
+ 4	not used
+ 1	0x20
+ 1	0x01
+ 1	filename length (x)
+ x	filename
+ 2	original file's CRC
+ 1	0x20
+ 2	first extended header size (0 if none)
+-----first extended header, etc.
+-----compressed file
+
+***********************************************************/
+
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "ar.h"
+
+#define FNAME_MAX (255 - 25) /* max strlen(filename) */
+#define namelen  header[19]
+#define filename ((char *)&header[20])
+
+int unpackable;            /* global, set in io.c */
+ulong compsize, origsize;  /* global */
+
+static uchar buffer[DICSIZ];
+static uchar header[255];
+static uchar headersize, headersum;
+static uint  file_crc;
+static char  *temp_name;
+
+static uint ratio(ulong a, ulong b)  /* [(1000a + [b/2]) / b] */
+{
+	int i;
+
+	for (i = 0; i < 3; i++)
+		if (a <= ULONG_MAX / 10) a *= 10;  else b /= 10;
+	if ((ulong)(a + (b >> 1)) < a) {  a >>= 1;  b >>= 1;  }
+	if (b == 0) return 0;
+	return (uint)((a + (b >> 1)) / b);
+}
+
+static void put_to_header(int i, int n, ulong x)
+{
+	while (--n >= 0) {
+		header[i++] = (uchar)((uint)x & 0xFF);  x >>= 8;
+	}
+}
+
+static ulong get_from_header(int i, int n)
+{
+	ulong s;
+
+	s = 0;
+	while (--n >= 0) s = (s << 8) + header[i + n];  /* little endian */
+	return s;
+}
+
+static uint calc_headersum(void)
+{
+	int i;
+	uint s;
+
+	s = 0;
+	for (i = 0; i < headersize; i++) s += header[i];
+	return s & 0xFF;
+}
+
+static int read_header(void)
+{
+	headersize = (uchar) fgetc(arcfile);
+	if (headersize == 0) return 0;  /* end of archive */
+	headersum  = (uchar) fgetc(arcfile);
+	fread_crc(header, headersize, arcfile);  /* CRC not used */
+	if (calc_headersum() != headersum) error("Header sum error");
+	compsize = get_from_header(5, 4);
+	origsize = get_from_header(9, 4);
+	file_crc = (uint)get_from_header(headersize - 5, 2);
+	filename[namelen] = '\0';
+	return 1;  /* success */
+}
+
+static void write_header(void)
+{
+	fputc(headersize, outfile);
+	/* We've destroyed file_crc by null-terminating filename. */
+	put_to_header(headersize - 5, 2, (ulong)file_crc);
+	fputc(calc_headersum(), outfile);
+	fwrite_crc(header, headersize, outfile);  /* CRC not used */
+}
+
+static void skip(void)
+{
+	fseek(arcfile, compsize, SEEK_CUR);
+}
+
+static void copy(void)
+{
+	uint n;
+
+	write_header();
+	while (compsize != 0) {
+		n = (uint)((compsize > DICSIZ) ? DICSIZ : compsize);
+		if (fread ((char *)buffer, 1, n, arcfile) != n)
+			error("Can't read");
+		if (fwrite((char *)buffer, 1, n, outfile) != n)
+			error("Can't write");
+		compsize -= n;
+	}
+}
+
+static void store(void)
+{
+	uint n;
+
+	origsize = 0;
+	crc = INIT_CRC;
+	while ((n = fread((char *)buffer, 1, DICSIZ, infile)) != 0) {
+		fwrite_crc(buffer, n, outfile);  origsize += n;
+	}
+	compsize = origsize;
+}
+
+static int add(int replace_flag)
+{
+	long headerpos, arcpos;
+	uint r;
+
+	if ((infile = fopen(filename, "rb")) == NULL) {
+		fprintf(stderr, "Can't open %s\n", filename);
+		return 0;  /* failure */
+	}
+	if (replace_flag) {
+		printf("Replacing %s ", filename);  skip();
+	} else
+		printf("Adding %s ", filename);
+	headerpos = ftell(outfile);
+	namelen = strlen(filename);
+	headersize = 25 + namelen;
+	memcpy(header, "-lh5-", 5);  /* compress */
+	write_header();  /* temporarily */
+	arcpos = ftell(outfile);
+	origsize = compsize = 0;  unpackable = 0;
+	crc = INIT_CRC;  encode();
+	if (unpackable) {
+		header[3] = '0';  /* store */
+		rewind(infile);
+		fseek(outfile, arcpos, SEEK_SET);
+		store();
+	}
+	file_crc = crc ^ INIT_CRC;
+	fclose(infile);
+	put_to_header(5, 4, compsize);
+	put_to_header(9, 4, origsize);
+	memcpy(header + 13, "\0\0\0\0\x20\x01", 6);
+	memcpy(header + headersize - 3, "\x20\0\0", 3);
+	fseek(outfile, headerpos, SEEK_SET);
+	write_header();  /* true header */
+	fseek(outfile, 0L, SEEK_END);
+	r = ratio(compsize, origsize);
+	printf(" %d.%d%%\n", r / 10, r % 10);
+	return 1;  /* success */
+}
+
+int get_line(char *s, int n)
+{
+	int i, c;
+
+	i = 0;
+	while ((c = getchar()) != EOF && c != '\n')
+		if (i < n) s[i++] = (char)c;
+	s[i] = '\0';
+	return i;
+}
+
+static void extract(int to_file)
+{
+	int n, method;
+	uint ext_headersize;
+
+	if (to_file) {
+		while ((outfile = fopen(filename, "wb")) == NULL) {
+			fprintf(stderr, "Can't open %s\nNew filename: ", filename);
+			if (get_line(filename, FNAME_MAX) == 0) {
+				fprintf(stderr, "Not extracted\n");
+				skip();  return;
+			}
+			namelen = strlen(filename);
+		}
+		printf("Extracting %s ", filename);
+	} else {
+		outfile = stdout;
+		printf("===== %s =====\n", filename);
+	}
+	crc = INIT_CRC;
+	method = header[3];  header[3] = ' ';
+	if (! strchr("045", method) || memcmp("-lh -", header, 5)) {
+		fprintf(stderr, "Unknown method: %u\n", method);
+		skip();
+	} else {
+		ext_headersize = (uint)get_from_header(headersize - 2, 2);
+		while (ext_headersize != 0) {
+			fprintf(stderr, "There's an extended header of size %u.\n",
+				ext_headersize);
+			compsize -= ext_headersize;
+			if (fseek(arcfile, ext_headersize - 2, SEEK_CUR))
+				error("Can't read");
+			ext_headersize = fgetc(arcfile);
+			ext_headersize += (uint)fgetc(arcfile) << 8;
+		}
+		crc = INIT_CRC;
+		if (method != '0') decode_start();
+		while (origsize != 0) {
+			n = (uint)((origsize > DICSIZ) ? DICSIZ : origsize);
+			if (method != '0') decode(n, buffer);
+			else if (fread((char *)buffer, 1, n, arcfile) != n)
+				error("Can't read");
+			fwrite_crc(buffer, n, outfile);
+			if (outfile != stdout) putc('.', stderr);
+			origsize -= n;
+		}
+	}
+	if (to_file) fclose(outfile);  else outfile = NULL;
+	printf("\n");
+	if ((crc ^ INIT_CRC) != file_crc)
+		fprintf(stderr, "CRC error\n");
+}
+
+static void list_start(void)
+{
+	printf("Filename         Original Compressed Ratio CRC Method\n");
+}
+
+static void list(void)
+{
+	uint r;
+
+	printf("%-14s", filename);
+	if (namelen > 14) printf("\n              ");
+	r = ratio(compsize, origsize);
+	printf(" %10lu %10lu %u.%03u %04X %5.5s\n",
+		origsize, compsize, r / 1000, r % 1000, file_crc, header);
+}
+
+static int match(char *s1, char *s2)
+{
+	for ( ; ; ) {
+		while (*s2 == '*' || *s2 == '?') {
+			if (*s2++ == '*')
+				while (*s1 && *s1 != *s2) s1++;
+			else if (*s1 == 0)
+				return 0;
+			else s1++;
+		}
+		if (*s1 != *s2) return 0;
+		if (*s1 == 0  ) return 1;
+		s1++;  s2++;
+	}
+}
+
+static int search(int argc, char *argv[])
+{
+	int i;
+
+	if (argc == 3) return 1;
+	for (i = 3; i < argc; i++)
+		if (match(filename, argv[i])) return 1;
+	return 0;
+}
+
+static void exitfunc(void)
+{
+	fclose(outfile);  remove(temp_name);
+}
+
+int main(int argc, char *argv[])
+{
+	int i, j, cmd, count, nfiles, found, done;
+
+	/* Check command line arguments. */
+	if (argc < 3
+	 || argv[1][1] != '\0'
+	 || ! strchr("AXRDPL", cmd = toupper(argv[1][0]))
+	 || (argc == 3 && strchr("AD", cmd)))
+		error(usage);
+
+	/* Wildcards used? */
+	for (i = 3; i < argc; i++)
+		if (strpbrk(argv[i], "*?")) break;
+	if (cmd == 'A' && i < argc)
+		error("Filenames may not contain '*' and '?'");
+	if (i < argc) nfiles = -1;  /* contains wildcards */
+	else nfiles = argc - 3;     /* number of files to process */
+
+	/* Open archive. */
+	arcfile = fopen(argv[2], "rb");
+	if (arcfile == NULL && cmd != 'A')
+		error("Can't open archive '%s'", argv[2]);
+
+	/* Open temporary file. */
+	if (strchr("ARD", cmd)) {
+		temp_name = tmpnam(NULL);
+		outfile = fopen(temp_name, "wb");
+		if (outfile == NULL)
+			error("Can't open temporary file");
+		atexit(exitfunc);
+	} else temp_name = NULL;
+
+	make_crctable();  count = done = 0;
+
+	if (cmd == 'A') {
+		for (i = 3; i < argc; i++) {
+			for (j = 3; j < i; j++)
+				if (strcmp(argv[j], argv[i]) == 0) break;
+			if (j == i) {
+				strcpy(filename, argv[i]);
+				if (add(0)) count++;  else argv[i][0] = 0;
+			} else nfiles--;
+		}
+		if (count == 0 || arcfile == NULL) done = 1;
+	}
+
+	while (! done && read_header()) {
+		found = search(argc, argv);
+		switch (cmd) {
+		case 'R':
+			if (found) {
+				if (add(1)) count++;  else copy();
+			} else copy();
+			break;
+		case 'A':  case 'D':
+			if (found) {
+				count += (cmd == 'D');  skip();
+			} else copy();
+			break;
+		case 'X':  case 'P':
+			if (found) {
+				extract(cmd == 'X');
+				if (++count == nfiles) done = 1;
+			} else skip();
+			break;
+		case 'L':
+			if (found) {
+				if (count == 0) list_start();
+				list();
+				if (++count == nfiles) done = 1;
+			}
+			skip();  break;
+		}
+	}
+
+	if (temp_name != NULL && count != 0) {
+		fputc(0, outfile);  /* end of archive */
+		if (ferror(outfile) || fclose(outfile) == EOF)
+			error("Can't write");
+		remove(argv[2]);  rename(temp_name, argv[2]);
+	}
+
+	printf("  %d files\n", count);
+	return EXIT_SUCCESS;
+}
+MZ” 2 X   —ÿÿ‘æ       "    û rj   – v•    Š  c  ş  H    à  Ç  ©  ‹  x    í  É  ö  ’  ,  ş  °  &  ¥
+  
+  ‡  a  ş  ‘  X  /  ˜  L  ½     î  W  ğ  9  Ÿ  ³  Î  6  ğ  Ó  ó   {   Õ  ó  œ  w"  ¸'  b'  8'  &  x%  Ó$  ,  $+  ú*  k*  )  .  ­-  -  ã2  R2  ,2  ø0  Ø0  ™0  )0  4  ÿ3  æ3  ²3  3  A  B  úG  úT  tT  9T  ¼S  OS  S  ëR  6R                                                                                                                                ºv.‰º´0Í!‹. ‹, Ú£} Œ{ ‰w ‰.‘ Ç ÿÿèö Ä>u ‹Ç‹Ø¹ÿ&=87u&‹U€ú=u€æßÿ €şYuÿ ò®ã<C&8uÖ€Í€÷Ù‰u ¹ ÓãƒÃƒãğ‰y ŒÒ+ê‹>œÿ s¿ ‰>œ±ÓïG;ïsé‹ßÚ‰‰ ‰ ¡{ +ØÀ´JWÍ!_ÓçúÒ‹çû3À.º¿4	¹¢q+Ïóªÿ&	èÂ-è¶.´ Í‰ƒ ‰… ÿ*	ÿ6s ÿ6q ÿ6o ÿ6m ÿ6k èPè_-.ºè[ ÿ(	‹ì´LŠFÍ!¹ º/ é‡ ¸ 5Í!‰[ Œ] ¸5Í!‰_ Œa ¸5Í!‰c Œe ¸5Í!‰g Œi ¸ %ŒÊÚºÍ!Ã¸ %Å[ Í!¸%Å_ Í!¸%Åc Í!¸%Åg Í!ÃÇ   ËÃ´@» Í!Ã¹ º= .ºèéÿ¸ PèJÿ  U‹ìV9&œwšdV  3öëA~™w!u~™™w‹V‹F3É»
+ šïE  ‰V‰Fë3Ò¸
+ RPÿv
+ÿvšIU  ‰V
+‰FFƒş|º‹V
+‹FÑêÑØFV;Vw'r;Fs ‹V‹FÑêÑØ‰V‰F‹V
+‹FÑêÑØ‰V
+‰F‹FF
+u3Àëÿv
+ÿv‹V
+‹FÑêÑØFVRPšIU  ë ^]ÃU‹ì9&œwšdV  ë"ŠF$ÿ‹^ˆ‡4)ÿF‹V
+‹F±šV  ‰V
+‰FÿN}Ù]ÃU‹ìƒì9&œwšdV  ÇFş  ÇFü  ë*‹Vş‹Fü±šèU  ‹^^ŠŸ4)· RP‹Ã™[YØÊ‰Nş‰^üÿN}Ñ‹Vş‹Füë ‹å]ÃVW9&œwšdV  3ÿ3öë	Š„4)´ øF A*´ ;Æî‹Ç%ÿ ë _^Ã9&œwšdV  ÿ6P*ÿ6N*èN8YY¢A*€>A* u3Àé ÿ6P*ÿ6N*è28YY¢B*ÿ6P*ÿ6N* A*´ P¸4)Pè÷ƒÄ
+è~ÿŠB*¶ ;Ât
+¸ÙPè
+YY¸ P¸ PèÿYY‰7*£5*¸ P¸	 PèóşYY‰;*£9*¸ P A*´ ûÿPèÚşYY£3* G)´ ‹ØÆ‡H) ¸ ë Ã9&œwšdV  ÿ6T*ÿ6R* A*´ PèFƒÄ¡3*3ÒRP¸ P A*´ ûÿPèTşƒÄÿ6T*ÿ6R*è×şPèêEƒÄÿ6T*ÿ6R* A*´ P¸4)Pè›ƒÄ
+Ã9&œwšdV  ¸ Pÿ67*ÿ65*ÿ6P*ÿ6N*èK5ƒÄ
+ÃV9&œwšdV  èfÿér ƒ>7* rw>5*  v¾  ë‹65*ÿ6P*ÿ6N*V¸ P¸4	Pè?<ƒÄ;Æt
+¸êPèŞ
+YYÿ6T*ÿ6R*V¸ P¸4	Pèz=ƒÄ;Æt
+¸õPè¸
+YY‹Æ3Ò)5*7*¡5*7*té‚ÿ^ÃV9&œwšdV  Ç;*  Ç9*  ÇF*  ë ÿ6T*ÿ6R*V¸4	Pè®ƒÄ
+‹Æ3Ò9*;*ÿ6L*ÿ6J*¸  P¸ P¸4	Pè–;ƒÄ‹ğ‹ÆÀu½‹;*¡9*‰7*£5*^ÃU‹ìƒìV9&œwšdV  ¸P¸H)PèK1ƒÄ‰L*£J*Ğu¸H)P¸P¸ØPèbOƒÄ3Àé±ƒ~ t¸H)P¸PèDƒÄèuşë¸H)P¸!PèøCƒÄÿ6T*ÿ6R*èN4YY‰Vú‰Fø¸H)Pè7AYY¢G) G)¢A*¸ P¸,P¸4)PèAƒÄ
+è¿ıÿ6T*ÿ6R*è4YY‰Vş‰FüÇ7*  Ç5*  3Ò3À‰;*£9*ÇC*  ÇF*  èOƒ>C* t,Æ7)0ÿ6L*ÿ6J*èPYY3ÀPÿvşÿvüÿ6T*ÿ6R*è+3ƒÄ
+èpş¡F*5  £3*ÿ6L*ÿ6J*è¿7YYÿ67*ÿ65*¸ P¸ Pè´ûƒÄÿ6;*ÿ69*¸ P¸	 PèûƒÄ¸ P¸2P¸A)PèÊ@ƒÄ
+¸ P¸9P A*´ 1)Pè±@ƒÄ
+3ÀPÿvúÿvøÿ6T*ÿ6R*è¢2ƒÄ
+èÊü¸ P3ÀPPÿ6T*ÿ6R*è‰2ƒÄ
+ÿ6;*ÿ69*ÿ67*ÿ65*èhúƒÄ‹ğ‹Æ»
+ 3Ò÷óR‹Æ»
+ 3Ò÷óP¸=PèwBƒÄ¸ ë ^‹å]ÃU‹ìƒìV9&œwšdV  3öë;v}
+ŠFşÄ^&ˆ Fÿ°|ÿ¼Ä¼K&Š´ ë
+¸°PèÆ3YY‰Fş=ÿÿtƒ~ş
+uÃÄ^&Æ  ‹Æë ^‹å]ÃU‹ìƒìVW9&œwšdV  ƒ~ uéz ëK¸H)P¸JP¸ØPèMƒÄ¸æ P¸H)Pè^ÿƒÄÀu¸gP¸ØPèîLƒÄèüé>¸H)Pè ?YY¢G)¸GP¸H)Pè”.ƒÄ‰T*£R*Ğtš¸H)P¸vPèvAƒÄëŒT*ÇR*Ä¸H)P¸…PèZAƒÄÇF*   7)´ ‰FşÆ7) ÿvş¸•PèX>ƒÄĞt¸ P¸4)P¸™Pè[MƒÄ
+Àtÿvş¸ŸP¸ØPèDLƒÄ
+èrûéM¸ P A*´ şÿPè½ùYY‹ğëhV¸³P¸ØPèLƒÄ
+‹Æ3Ò)5*7*¸ P‹Æşÿ3ÒRPÿ6P*ÿ6N*è‘0ƒÄ
+Àt
+¸ÛPèiYYÿ6P*ÿ6N*èQ2YY‹ğÿ6P*ÿ6N*èB2YY±Óàğöu”ÇF*  ƒ~ş0tèNé­ ƒ>;* rw>9*  v¿  ë‹>9*ƒ~ş0t¸4	PWè7ƒÄë&ÿ6P*ÿ6N*W¸ P¸4	Pè>7ƒÄ;Çt
+¸æPèİYYÿ6T*ÿ6R*W¸4	Pè	ƒÄ
+‹T*¡R*»ÄŒÙ;Ñu;Ãt&ÿØ}°.ÿäÄäK&ˆ´ ë¸ØP°.Pèì?ƒÄ‹Ç™)9*;*¡9*;*téGÿƒ~ tÿ6T*ÿ6R*è,4YYëÇT*  ÇR*  ¸ñPè‹?YY¡F*5  ;3*t¸óP¸ØPèªJƒÄ_^‹å]Ã9&œwšdV  ¸şPèT?YYÃV9&œwšdV  ¸H)P¸5Pè8?ƒÄ€>G)v
+¸;Pè&?YYÿ6;*ÿ69*ÿ67*ÿ65*èáöƒÄ‹ğ¸4)Pÿ63*‹Æ»è3Ò÷óR‹Æ»è3Ò÷óPÿ67*ÿ65*ÿ6;*ÿ69*¸KPè×>ƒÄ^ÃU‹ì9&œwšdV  ë<Ä^ÿF&€?*uëÿFÄ^&€? tÄ^&ŠÄ^&:uæëÄ^&€? u3Àë@ëÿFÄ^&€?*t»Ä^&€??t²Ä^&ŠÄ^&:t3ÀëÄ^&€? u¸ ë	ÿFÿFé‡ÿ]ÃU‹ìV9&œwšdV  ƒ~u¸ ë5¾ ë'‹ÆÑàÑàÄ^Ø&ÿw&ÿ7¸H)Pè>ÿƒÄÀt¸ ë
+F;v|Ô3Àë ^]Ã9&œwšdV  ÿ6T*ÿ6R*èj2YYÿ6?*ÿ6=*è—:YYÃU‹ìƒì
+VW9&œwšdV  ƒ~|IÄ^&Ä_&€ u;Ä^&Ä_&Š˜Pè±JY‰FøP¸lPè­:ƒÄĞtƒ~uÿvø¸sPè•:ƒÄĞtÿ6– ÿ6” è&YY¾ ë$¸vP‹ÆÑàÑàÄ^Ø&ÿw&ÿ7èJƒÄĞtëF;v|×ƒ~øAu;v}
+¸yPèãYY;v}ÇFúÿÿë	‹Fıÿ‰Fú¸ŸPÄ^&ÿw
+&ÿwèú)ƒÄ‰P*£N*¡N*P*uƒ~øAtÄ^&ÿw
+&ÿw¸¢PèƒÄÿvø¸ºPèÜ9ƒÄĞtG3ÀPPè,9YY‰?*£=*¸¾Pÿ6?*ÿ6=*è™)ƒÄ‰T*£R*¡R*T*u
+¸ÁPè=YY¸õPèU"YëÇ?*  Ç=*  è¯3ÿ‰~şƒ~øAté¬ ¾ éŒ ÇFö ë4‹ÆÑàÑàÄ^Ø&ÿw&ÿ7‹FöÑàÑàÄ^Ø&ÿw&ÿ7è•9ƒÄÀuë
+ÿFö‹Fö;Æ|Å‹Fö;Æu?‹ÆÑàÑàÄ^Ø&ÿw&ÿ7¸H)Pè“9ƒÄ3ÀPèy÷YÀtGë‹ÆÑàÑàÄ^Ø&Ä&Æ ëÿNúF;v}élÿÿt	¡N*P*uÇFş éĞ ÿvÿvÿvèNıƒÄ‰Fü‹Fø¹ »t.;tCCâ÷é© .ÿgA D L P R X ¬¬÷ËŒËƒ~ü t¸ PèìöYÀtGëèÜõëè×õém ƒ~ü tƒ~øDu¸ ë3Àøè–õëè·õëNƒ~ü t!ƒ~øXu¸ ë3ÀPèùYG‹Ç;FúuÇFş ëèeõë"ƒ~ü tÿuèûè”ûG‹Ç;FúuÇFş èCõë ƒ~ş u
+èôÀté ÿ¡=*?*tfÿtbÿ6T*ÿ6R*3ÀPèã:ƒÄÄR*&÷G uÿ6T*ÿ6R*è/YY=ÿÿu
+¸ÛPèA YYÄ^&ÿw
+&ÿwè27YYÄ^&ÿw
+&ÿwÿ6?*ÿ6=*èİFƒÄW¸çPèK:ƒÄ3Àë _^‹å]ÃU‹ìƒì9&œwšdV  ŒÓÃ^ŒFş‰^üÿØ}°
+ÿäÄäK&ˆ´ ë¸ØP°
+Pè:ƒÄÿvşÿvüÿvÿv¸ØPè-GƒÄÿØ}°
+ÿäÄäK&ˆ´ ë¸ØP°
+PèŞ9ƒÄ¸ Pè-Y‹å]ÃU‹ìƒìVW9&œwšdV  3ÿë.‹÷ÇFş  ë÷Æ t‹ÆÑè5 ‹ğëÑîÿFşƒ~şrä‹ßÑã‰·V*Gÿÿ vÌ_^‹å]ÃU‹ì9&œwšdV  ŠNÓ&H*ë`¡X,)FŠN¡V,Óà	H*¡5*7*t9ƒ.5*ƒ7* ÄN*&ÿ|ÄN*&ÿG&Ä_K&Šëÿ6P*ÿ6N*è*‹å´ £V,ëÇV,  ÇX, ‹F;X,—‹F)X,ŠX,¡V,Óè	H*]ÃU‹ìV9&œwšdV  ±*N‹6H*ÓîÿvèJÿY‹Æë ^]ÃU‹ìVW9&œwšdV  ‹~‹v;6X,})6X,ŠX,‹ÇÓà	V,é‹7*¡5*;;*w`r;9*sXÄR*&ÿ}$+6X,‹ÆŠÈ‹ÇÓè
+V,ÄR*&ÿG&Ä_K&ˆ´ ëÿ6T*ÿ6R*+6X,‹ÆŠÈ‹ÇÓè
+V,Pè38ƒÄƒ5*ƒ7* ëÇC* ƒş}¸ +Æ£X,ŠÈ‹ÇÓà£V,éz ‹7*¡5*;;*wVr;9*sNÄR*&ÿ}‹ÆŠÈ€Áø‹ÇÓèÄR*&ÿG&Ä_K&ˆ´ ëÿ6T*ÿ6R*‹ÆŠÈ€Áø‹ÇÓèPè±7ƒÄƒ5*ƒ7* ëÇC* ¸ +Æ£X,ŠÈ‹ÇÓà£V,_^]ÃU‹ìVW9&œwšdV  ‹vÿvÿv
+V¸ PÿvÿvèV.ƒÄ‹ø‹÷‹Æ™9*;*ë(Ä^&Š´ ‹Ø3F*ãÿ Ñã‹‡V*‹F*±Óê3Â£F*ÿFO}Õ‹Æë _^]ÃU‹ìV9&œwšdV  ‹vÿvÿv
+V¸ PÿvÿvèJ/ƒÄ;Æs
+¸ôPèˆüYYë(Ä^&Š´ ‹Ø3F*ãÿ Ñã‹‡V*‹F*±Óê3Â£F*ÿFN}Õ^]Ã9&œwšdV  ÇH*  ÇV,  ÇX,  ¸ PèıYÃ9&œwšdV  ÇX, ÇV,  Ã9&œwšdV  ¡té| ¸ APèAY‰d,£b,¸ !Pè2Y‰`,£^,¸ !Pè#Y‰z,£x,¸ BPèY‰r,£p,¸ €PèY‰l,£j,¸ €PèöY‰h,£f,¸àáPèçY‰£¡u
+¸Pè‡ûYYÃU‹ìƒì9&œwšdV  ÇFş  ëÄ^,^ş&Æ‹FşÑàÄp,Ø&Ç  ÿFş~şÿ ~ÛÇFş  ë‹FşÑàÄj,Ø&Ç  ÿFş~ş @|æÇ\, ÇFş ë‹Fş@‹VşÑâÄÚ&‰ÿFş~şÿ|äÄ&Ç‡ş?  ÇFş @ë‹FşÑàÄØ&Ç  ÿFş~şïp~æ‹å]ÃU‹ìƒì9&œwšdV  ŠF´ ±ÓàF @ÑàÄØ&‹‰Fş‹FÄj,&‰ë‹FşÑàÄØ&‹‰Fş‹FşÑàÄj,Ø&‹;FuÜ‹Fşë ‹å]ÃU‹ìƒì9&œwšdV  ŠF´ ±ÓàF @‰Fü‹FüÑàÄØ&‹‰Fş‹F‹VüÑâÄÚ&‰‹Fş‹VÑâÄÚ&‰‹F‹VşÑâÄf,Ú&‰‹Fü‹VÑâÄf,Ú&‰‹F‹VÑâÄj,Ú&‰Äx,^&ş‹å]ÃU‹ìƒì9&œwšdV  ¡\,‰Fü‹FüÑàÄØ&‹£\,Äx,^ü&Æ ‹FÑàÄf,Ø&‹‰Fş‹Fş‹VüÑâÄf,Ú&‰‹Fü‹VşÑâÄÚ&‰‹FÑàÄØ&‹‰Fş‹Fş‹VüÑâÄÚ&‰‹Fü‹VşÑâÄf,Ú&‰‹FÑàÄj,Ø&‹‹VüÑâÄj,Ú&‰ n,Ä^,^ü&ˆ¡Z,‹VüÑâÄp,Ú&‰ÿv¡t,n,Äb,Ø&ŠPÿvüè|şƒÄÿ6Z,¡Z,n,Äb,Ø&ŠPÿvüè^şƒÄ‹å]ÃU‹ìƒì9&œwšdV  ƒ>n,}é¹ ÿn,¡t,@  ‰Fğë‹FğÑàÄØ&‹‰Fğ‹FğÑàÄj,Ø&‹‰FîÀtÚë‹Fî‰Fğ‹FîÑàÄj,Ø&‹‰FîÄ^,^î&Š´ ;n,}×‹Fî‰Fôë"¡Z,‹VôÑâÄp,Ú&‰‹FôÑàÄj,Ø&‹‰Fô‹FôÑàÄp,Ø&ƒ? |Í~ô  }¡Z, €‹VôÑâÄp,Ú&‰ëSÄb,Z,&Š´   ‰FîÄb,Z,&ŠGˆF÷ÿv÷ÿvîèñüYY‰FğÀuÿ6Z,ÿv÷ÿvîèBıƒÄÇn, éÇn, ~ğ  |ÇFò ‹Fğ£t,ë#Ä^,^ğ&Š´ ‰Fò‹FğÑàÄp,Ø&‹%ÿ£t,¡t,;Z,|.t,  ¡Z,n,Äb,ØŒFú‰^ø¡t,n,Äb,ØŒFş‰^üë"Ä^ø&ŠÄ^ü&:t
+ÿvğèEıYéÿn,ÿFøÿFü¡n,;Fò|Ö>n, |ëK¡Z,‹VğÑâÄp,Ú&‰‹Fğ‰FîÄ^ø&ŠPÿvîèüYY‰FğÀuÿ6Z,Ä^ø&ŠPÿvîèPüƒÄé¢ ÿn,éÿ‹FğÑàÄf,Ø&‹‰Fô‹Fô‹Z,ÑâÄf,Ú&‰¡Z,‹VôÑâÄÚ&‰‹FğÑàÄØ&‹‰Fô‹Fô‹Z,ÑâÄÚ&‰¡Z,‹VôÑâÄf,Ú&‰‹Fî‹Z,ÑâÄj,Ú&‰‹FğÑàÄj,Ø&Ç  ¡Z,‹VğÑâÄÚ&‰‹å]ÃU‹ìƒì
+9&œwšdV  ¡Z,ÑàÄj,Ø&ƒ? ué_¡Z,ÑàÄf,Ø&‹‰Fø¡Z,ÑàÄØ&‹‰Fú‹Fú‹VøÑâÄÚ&‰‹Fø‹VúÑâÄf,Ú&‰¡Z,ÑàÄj,Ø&‹‰Fø¡Z,ÑàÄj,Ø&Ç  ~ø  }Äx,^ø&ş&Š<véß‹FøÑàÄp,Ø&‹%ÿ‰Fü‹Fü;Z,|nü  ‹Fü‰Fú‹FøÑàÄj,Ø&‹‰FöëFfşÿ‹Fş;Z,|nş  ‹Fş;Fú~‹Fş‰Fú‹Fú  ‹VöÑâÄp,Ú&‰‹FöÑàÄj,Ø&‹‰Fö‹FöÑàÄp,Ø&‹‰Fş© €u¤~ö  }0‹Fş;Z,|nş  ‹Fş;Fú~‹Fş‰Fú‹Fú  ‹VöÑâÄp,Ú&‰Ä^,^ø&Š´ FüÄb,Ø&ŠPÿvøè«ùYY‰Fú‹FúÑàÄf,Ø&‹‰Fü‹FúÑàÄØ&‹‰Fş‹Fş‹VüÑâÄÚ&‰‹Fü‹VşÑâÄf,Ú&‰‹FøÑàÄf,Ø&‹‰Fü‹Fú‹VüÑâÄÚ&‰‹Fü‹VúÑâÄf,Ú&‰‹FøÑàÄØ&‹‰Fü‹Fú‹VüÑâÄf,Ú&‰‹Fü‹VúÑâÄÚ&‰‹FøÑàÄj,Ø&‹‹VúÑâÄj,Ú&‰‹FøÑàÄj,Ø&Ç  ¡\,‹VøÑâÄÚ&‰‹Fø£\,‹å]ÃV9&œwšdV  ÿv,ÿZ,¡Z,= @un¸ !P‹d,¡b,  RPÿ6d,ÿ6b,èÖ+ƒÄ
+ÿ6L*ÿ6J*¸  P‹d,¡b, !RPèöƒÄ
+‹ğ6v,ÇZ,  ÿØ}°.ÿäÄäK&ˆ´ ë¸ØP°.PèW-ƒÄèëüè5ú^ÃU‹ìƒìV9&œwšdV  èÃöèT÷èˆÿ6L*ÿ6J*¸ !P‹d,¡b,  RPèõƒÄ
+£v,ÿØ}°.ÿäÄäK&ˆ´ ë¸ØP°.Pèí,ƒÄÇn,  ÇZ,  èÂù¡n,;v,~¡v,£n,ép ‹6n,¡t,‰FşèŞş¡n,;v,~¡v,£n,¡n,;Æƒş}3ÀPÄb,Z,K&Š´ PèYYë/¡Z,+Fşşÿ%ÿP‹Æı PèùYYëèşNú¡n,;v,~¡v,£n,ƒ>v, ~
+ƒ>C* uéÿè,^‹å]Ã9&œwšdV  è:Ç~,  ÃU‹ìƒìVW9&œwšdV  ‹~3öë#Ä^|,&ŠÄ^&ˆ ¡|,@%ÿ£|,F‹Æ;Çuëmÿ~,}×èê‰Fş~şÿ wŠFşÄ^&ˆ F‹Æ;ÇuëHëD‹Fşÿ£~,èS‹Ö+ĞJâÿ‰|,ë#Ä^|,&ŠÄ^&ˆ ¡|,@%ÿ£|,F‹Æ;Çuëÿ~,}×ë™_^‹å]ÃU‹ìV9&œwšdV  ‹v;6€,}ƒ>}‹ë» Ñãÿ‡0ë ÿ‹ŞÑãÿ·°6èÁÿY‹ŞÑãÿ·¦^èµÿYÿ^]ÃU‹ìƒìVW9&œwšdV  ÇFş  ë‹^şÑãÇ‡0  ÿFşƒ~ş~ìÿvèyÿY3öÇFş ë‹^şÑã‹‡0±*NşÓàğÿNşƒ~ş åëG¸P¸ØPèÜ5ƒÄÿ®0ÇFş ë%‹^şÑãƒ¿0 t‹^şÑãÿ0‹^şCÑãƒ‡0ë	ÿNşƒ~ş ÕNöuµÇFş ë)‹^şÑã‹¿0ëŠFşÄŠ0&‹Ä‚,Ú&ˆƒŠ0O}åÿNşƒ~ş Ñ_^‹å]ÃU‹ìƒìVW9&œwšdV  ‹~‹ßÑã‹‡†,‰Fşëg;6ˆ0}*‹ŞÑã‹‡†,ÑàÄ„0Ø&‹‹ŞCÑã‹—†,ÑâÄ„0Ú&;vF‹FşÑàÄ„0Ø&‹‹ŞÑã‹—†,ÑâÄ„0Ú&;wë‹ŞÑã‹‡†,‹ßÑã‰‡†,‹ş‹÷Ñæ‹Æ;ˆ0~‹Fş‹ßÑã‰‡†,_^‹å]ÃU‹ìƒì$V9&œwšdV  ÇFŞ  ¾ ë$‹ŞÑãFÜØ6‹‹ŞÑã‡0Ñà‹ŞCÑãVÜÚ6‰Fƒş~×3öë$Ä^&Š ´ ‹ØÑãFÜØ6‹6ÿ‹ÖÑâÄ^
+Ú&‰F;v|×^‹å]ÃU‹ìƒìVW9&œwšdV  ‹F£€,Ä^Œ†0‰„0Ä^
+Œ„,‰‚,¡€,‰FşÇˆ0  Çˆ,  3öë'Ä‚,&Æ  ‹ÆÑàÄ„0Ø&ƒ? tÿˆ0‹ˆ0Ñã‰·†,F;6€,|Óƒ>ˆ0}¡ˆ,ÑàÄ^Ø&Ç  ¡ˆ,éğ ¡ˆ0» ™÷û‹ğëVèCşYNƒş}õÄ^ŒŒ0‰Š0‹6ˆ,;6€,}ÄŠ0&‰7ƒŠ0‹ˆ0Ñã‹‡†,£ˆ,ÿˆ0¸ PèşY¡ˆ,‰Fü‹Fü;€,}‹FüÄŠ0&‰ƒŠ0‹~şÿFş‹ÆÑàÄ„0Ø&‹‹VüÑâÄ„0Ú&‹×ÑâÄ„0Ú&‰‰>ˆ,¸ Pè«ıY‹ßÑã‰·°6‹Fü‹ßÑã‰‡¦^ƒ>ˆ0~é\ÿÄ^ŒŒ0‰Š0WèœüYÿvÿvÿvÿv
+ÿvèşƒÄ
+‹Çë _^‹å]ÃU‹ìƒìxVW9&œwšdV  ¾ ë‹ŞÑãFˆØ6Ç  Fƒşvì3öëÄ^&Š ´ ‹ØÑãFˆØ6ÿF;vræÇFÎ  ¾ ë0‹ŞÑãFÌØ6‹‹ŞÑãVˆÚ6‹±‹Ş*ËÓâÂ‹ŞCÑãVÌÚ6‰FƒşvËƒ~î t
+¸Pè±ìYY¸ +F
+‰Fø¾ ë(ŠNø‹ŞÑãFÌØ6Ó/ŠN
+‹Æ*È¸ Óà‹ŞÑãVªÚ6‰F;v
+vÓë±‹Æ*È¸ Óà‹ŞÑãVªÚ6‰Fƒşvã‹^
+CÑãFÌØ6‹7ŠNøÓîöt!¸ ŠN
+Óà‰Fôë‹ÆÑàÄ^Ø&Ç  F;vôuì‹F‰Fú±*N
+¸ Óà‰FşÇFö  éÄ^^ö&Š´ ‹ø‹ÇÀuéì ‹ßÑãFÌØ6‹‹ßÑãVªÚ6‰Fü;~
+w&‹ßÑãFÌØ6‹7ë‹Fö‹ÖÑâÄ^Ú&‰F;vürëé— ‹ßÑãFÌØ6‹‰Fô‹FôŠNøÓèÑàÄ^ØŒFò‰^ğ‹÷+v
+ë_Ä^ğ&ƒ? u 3À‹^úÑã‰‡°6‹^úÑã‰‡¦^‹FúÄ^ğ&‰ÿFú‹Fş…FôtÄ^ğ&‹ÑãÃ¦^ŒFò‰^ğëÄ^ğ&‹ÑãÃ°6ŒFò‰^ğÑfôNöu‹FöÄ^ğ&‰‹Fü‹ßÑãVÌÚ6‰ÿFö‹Fö;Fséğş_^‹å]ÃU‹ìƒìVW9&œwšdV  3öë‹ŞÑãÇ‡o  Fƒş|ğ¿şëOÿ~€½±4 tô3öëbŠ„²4´ ‰FüFƒ~ü uGÇFş ëFÿFş;÷}€¼²4 tñƒ~ş	‹Fşoë ƒ~şÿoëƒ~şu
+ÿoÿoëÿoë‹^üCCÑãÿ‡o;÷|š_^‹å]ÃU‹ìVW9&œwšdV  ëÿNƒ~ ~
+‹^€¿·n tíÿvÿvè²ëYY3öë[Š„¸n´ ‹øFƒÿW¸ Pè–ëYYë‹ÇŠÈ€Áı¸ ÓàşÿP‹ÇıÿPèyëYY;vu!ëFƒş}€¼¸n tó‹Æıÿ% P¸ PèSëYY;v| _^]ÃU‹ìƒìVW9&œwšdV  ÇFşşëÿNşƒ~ş ~
+‹^ş€¿±4 tíÿvş¸	 PèëYY3ÿéŞ Š…²4´ ‰FüGƒ~ü té± ¾ ëGF;~ş}€½²4 tòƒş"ÇFü  ëÿ6œf ¸n´ PèËêYYÿFü‹Fü;Æ|çëuƒş ÿ6f ¹n´ Pè«êYY‹ÆıÿP¸ PèœêYYëPƒşu-ÿ6œf ¸n´ Pè†êYYÿ6f ¹n´ PèwêYY¸ P¸ PèjêYYëÿ6 f ºn´ PèYêYY‹ÆìÿP¸	 PèJêYYë‹^üCCÑãÿ·œf‹^üŠ‡ºn´ Pè.êYY;~ş}éÿ_^‹å]ÃU‹ì9&œwšdV  ‹^Ñãÿ·¶0‹^Š‡²4´ Pèúé‹å]ÃU‹ìVW9&œwšdV  3ö‹~ëÑïFÿuù‹ŞÑãÿ·œfŠ„¸n´ PèÆéYYƒşv±‹Æ*È¸ÿÿÓè#FP‹ÆHPè©éYY_^]ÃU‹ìƒìVW9&œwšdV  ¸¶0P¸²4P¸ÂfP¸şPèùƒÄ‹ø‹ßÑã‹‡Âf‰Fşÿvş¸ Pè`éYYÿşrRèÍü¸œfP¸¸nP¸oP¸ Pè×øƒÄ‹øƒÿr¸ P¸ P¸ PèFıƒÄë3ÀP¸ PèéYYW¸ PèéYYèÀıë.3ÀP¸ PèüèYY3ÀP¸ PèğèYY3ÀP¸	 PèäèYYW¸	 PèÚèYY¸œfP¸¸nP¸ËnP¸ PèZøƒÄ‹øƒÿr¸ÿÿP¸ P¸ PèÉüƒÄë3ÀP¸ PèšèYYW¸ PèèYYÇFü  3öé” ÷Æ u‹FüÄ²0Ø&Š´ ‰FúÿFüëÑfú÷Fú€ tN‹FüÿFüÄ²0Ø&Š´  Pè(şY‹FüÄ²0Ø&Š´ ±Óà‰FøÿFü‹FüÄ²0Ø&Š´ FøÿFüÿvøèşYë‹FüÿFüÄ²0Ø&Š´ PèİıYƒ>C* të2F;vşsédÿ3öë‹ŞÑãÇ‡Âf  Fşşrï3öë‹ŞÑãÇ‡Ën  Fƒşrğ_^‹å]ÃU‹ì9&œwšdV  Ñ.Oq¡OqÀu;ÇOq€ ¡(èÿ;Mqwèèıƒ>C* té– ÇMq  ¡Mq£°0ÿMqÄ²0°0&Æ ŠF‹MqÄ²0Ú&ˆÿMq‹^Ñãÿ‡Âf~ rV OqÄ²0°0&‹F±Óè‹MqÄ²0Ú&ˆÿMqŠF‹MqÄ²0Ú&ˆÿMqÇF  ëÑnÿFƒ~ uô‹^Ñãÿ‡Ën]ÃV9&œwšdV  ƒ>( u?Ç( @ë$¡(»
+ 3Ò÷óº	 ÷â£(>( s
+¸*PèåYYÿ6(èNY‰´0£²0ĞtÉÄ²0&Æ 3öë‹ŞÑãÇ‡Âf  Fşş|ï3öë‹ŞÑãÇ‡Ën  Fƒş|ğ3À£Oq£Mqèè^Ã9&œwšdV  ƒ>C* uè¡ü3ÀP¸ Pè:æYYÃU‹ìƒìVW9&œwšdV  ÿvèöåY‹øÿu2ÿvèéåY‰Fü3öëÆ„¸n F;v|õ3öë‹Fü‹ŞÑã‰‡KoFş |îéŒ 3öë`¡H*±Óè‰Füƒ~üuÇFş ëÑnşÿFü¡H*…Fşuòƒ~ü}¸ ë‹FüıÿPèéäYŠFüˆ„¸nF;vu¸ PèjåY‰FüëÆ„¸n FÿNü}õ;÷|œëÆ„¸n F;v|õ¸KoP¸ P¸¸nPÿvèxöƒÄ_^‹å]ÃU‹ìƒìVW9&œwšdV  ¸	 PèåY‰Füƒ~ü u0¸	 Pè åY‹ğ3ÿëÆ…²4 Gÿş|ô3ÿë	‹ßÑã‰·¦>Gÿ |ñé¾ 3ÿé‹ ‹H*±ÓëÑã‹·Koƒş|(ÇFş€ ‹Fş…H*t
+‹ŞÑã‹·¦^ë‹ŞÑã‹·°6Ñnşƒş}İŠ„¸n´ Pè÷ãYƒş7öu¾ ë!ƒşu¸ PèräY‹ğƒÆë¸	 PècäY‹ğƒÆëÆ…²4 GN}÷ë	‹Æşˆ…²4G;~ü}émÿëÆ…²4 Gÿş|ô¸¦>P¸ P¸²4P¸şPè`õƒÄ_^‹å]ÃVW9&œwšdV  ƒ>Kq u2¸ PèøãY£Kq¸ P¸ P¸ PèÖıƒÄè´ş¸ÿÿP¸ P¸ PèÁıƒÄÿKq‹H*±ÓëÑã‹·¦>şşr#¿ …>H*t
+‹ŞÑã‹·¦^ë‹ŞÑã‹·°6ÑïşşsàŠ„²4´ PèòâY‹Æë _^ÃVW9&œwšdV  ‹H*±ÓëÑã‹·Koƒşr"¿€ …>H*t
+‹ŞÑã‹·¦^ë‹ŞÑã‹·°6ÑïƒşsáŠ„¸n´ PèâYöt‹ÆHPè(ãY‹ÖŠÊ€Áÿº ÓâÂ‹ğ‹Æë _^Ã9&œwšdV  è8åÇKq  ÃU‹ìV‹vö|ƒşXv¾W ‰6:Š„<˜–ë÷Şƒş#wêÇ:ÿÿ‹Æ£ ¸ÿÿë ^]Â ÃU‹ìë
+‹Ñãÿ—Rq¡ÿÀuëÿ–ÿ˜ÿšÿvèuÒY]Ã      .’..Œ”.ü{ ¾€ 2ä&¬@ŒÅ‡Ö“‹6u ƒÆ¹ €>} rw ‹ş±2Àò®ãv€ñƒì¸ ÃÁ%şÿ‹ü+ør`‹çŒÀØŒĞÀQIó¤2Àªİ‡ò‡Ù‹Ã‹ĞCè wr@è wù< t<t<	uè2ÀëäÀtBª
+ÀuC†à2Àùã¬I,"t"<\u€<"u¬IöÃéXÒYÊ.”.‰k CÛÛ‹ô‹ì+ërä‹å‰.m Œo ã‰v ŒVƒÅ6¬
+Ààútí3À‰F ‰F.ÿ&’.w 3ÿÿ6y èX ƒÄ‹Ø£q ‰s ÚÂuéğÑ3À¹ÿÿ‰?ŒGƒÃò®&8uñ‰‰GÃU‹ìƒ> u¸ ë‹F‹Ñã‰‡Rqÿ3Àë ]ÃU‹ì‹F3ÒRPèî‹åë ]ÃU‹ìƒìÄ^&‹W&‹G‰ª£¨‹N‹^š¦4  uÇª  Ç¨  ë1Ä^&Ä_ŒFş‰^ü‹Vş‹FüÄ¨&‰W
+&‰G‹ª¡¨Ä^ü&‰W&‰G‹å]ÃU‹ìƒì‹V
+‹FÄ^&)&WÄ^&‹O&‹‹V‹FšK4  ‰Vş‰Fü‹V
+‹F ƒÒ Ä^ü&‰W&‰‹V‹FÄ^ü&‰W&‰G‹N‹^‹¦¡¤š¦4  uÄ^üŒ¦‰¤ë(‹Vş‹Fü‹N
+‹^šK4  ‰V‰F‹Vş‹FüÄ^&‰W&‰G‹Vş‹Fü ë ‹å]ÃU‹ìƒìÿvÿvè¡YY‰Vş‰Füƒ~şÿuƒ~üÿu3Ò3Àë?‹¦¡¤Ä^ü&‰W&‰G‹V‹F ƒÒ Ä^ü&‰W&‰Ä^üŒ¦‰¤‹¦¡¤ ë ‹å]ÃU‹ìƒìÿvÿvè5YY‰Vş‰Füƒ~şÿuƒ~üÿu3Ò3Àë7Ä^üŒ¢‰ Ä^üŒ¦‰¤‹V‹F ƒÒ Ä^ü&‰W&‰‹Vş‹Fü ë ‹å]ÃU‹ìƒì‹FFu3Ò3Àéò ‹V‹F ƒÒ %ğÿâÿÿ‰V‰F3É3Û‹¢¡ š¦4  uÿvÿvèSÿYYé¹ ‹ª¡¨‰Vş‰Fü3É3Ûš¦4  ué‘ Ä^ü&‹W&‹‹N‹^ƒÃ0ƒÑ ;Ñru;ÃrÿvÿvÿvşÿvüèèıƒÄëjÄ^ü&‹W&‹;Vr)u;Fr"ÿvşÿvüè\ıYYÄ^ü&ƒ&ƒW ‹Vş‹Fü ë2Ä^ü&Ä_ŒFş‰^ü‹ª‹¨‹Vş‹Füš¦4  téoÿÿvÿvè-şYYë ‹å]ÃU‹ìVW‹vF+6{ ‹Æ? ±Óè‹ğ;6¬uÄ^Œ ‰‹ ¸ ëZ±Óæ‹>‘ ‹Æ{ ;Çv‹÷+6{ Vÿ6{ è~YY‹øƒÿÿu‹Æ±Óè£¬Ä^Œ ‰‹ ¸ ëë¡{ Ç3Ò‹Ğ3À‰‘ £ 3Àë _^]Â U‹ì‹‰ ‹‡ ‹V‹Fš¦4  r"‹‘ ‹ ‹V‹Fš¦4  wÿvÿvè<ÿÀu¸ÿÿëë3Àë ]ÃU‹ìƒì‹ ¡‹ ‹N‹^šK4  ‰Vú‰Fø‹‰ ‹‡ ‹Vú‹Føš¦4  r‹‘ ‹ ‹Vú‹Føš¦4  vºÿÿ¸ÿÿë'Ä‹ ŒFş‰^üÿvúÿvøèÈşÀuºÿÿ¸ÿÿë‹Vş‹Füë ‹å]ÃÉ}÷Ó÷ÑƒÃƒÑ ë-ÃsÂ Šé±ÒåõŠèÓèĞŠÅ% ËÉ}÷Ó÷ÑƒÃƒÑ ëÔ+Ãsê Šù±Òç2Û+ÓŠèÓèĞŠÅ% ËQŠè±ÓèĞŠÅŠãÓëYËŠÜ% ƒã;Ñu;ÃËU‹ì´J‹^FÍ!r¸ÿÿëSPèGùXë ]ÃU‹ìƒìVW3öÇFü  3ÿÄ^ÿF&ŠˆFÿ<ru¾ ¿ ë+€~ÿwu¾ÇFü€ ¿ ë€~ÿau¾	ÇFü€ ¿ ë3Àé Ä^&ŠˆFÿÿF€~ÿ+tÄ^&€?+u-€~ÿtt€~ÿbu!€~ÿ+u	Ä^&ŠˆFÿ‹Æ%üÿ ‹ğÇFü€¿ €~ÿtuÎ @ë#€~ÿbu
+Î €Ï@ ë¡h% Àğ‹Æ© €tÏ@ Ç˜Œ?Ä^&‰7‹FüÄ^&‰‹Çë _^‹å]Â U‹ìƒìÿvÿvFüPFşPèûşÄ^&‰GÀt'Ä^&€ }4ÿvşÿvüÿv
+ÿvèÃƒÄÄ^&ˆG
+À}Ä^&ÆGÿÄ^&ÇG  3Ò3ÀëiÄ^&ŠG˜PèèYÀt	Ä^&O ¸ PÄ^&÷G t¸ ë3ÀP3ÀPPÿvÿvèÎƒÄÀtÿvÿvèôYY3Ò3ÀëëÄ^&ÇG  ‹V‹Fë ‹å]Â U‹ìƒìŒ^şÇFü°ëë Ä^ü&€ |‹Vş‹FüƒFü»@ŒÙ;ÃráÄ^ü&€ |3Ò3Àë
+ë‹Vş‹Füë ‹å]ÃU‹ìƒìèªÿ‰Vş‰FüĞu3Ò3Àëëÿvşÿvüÿvÿvÿv
+ÿvè²şë ‹å]ÃU‹ìÄ^&‹G;Ft3Ò3Àë"ÿvÿvè2‹åÿvÿvÿvÿvÿv
+ÿvèwşë ]ÃU‹ìƒìƒ~ |è5ÿ‰Vş‰FüĞu3Ò3ÀëŠFÄ^ü&ˆGÿvşÿvü3ÀPPÿvÿvè7şë ‹å]ÃU‹ì‹N´<ÅVÍ!rëPèpöë ]Â U‹ì‹^+É+Ò´@Í!ë ]Â U‹ìƒìVW‹~÷Ç Àu¡h% Àø÷Ç ué— ¡j!F
+‹F
+©€u¸ Pèö3ÀPÿvÿvèDƒÄ‰Fü=ÿÿu÷F
+€ t3Àë¸ ‰Füë÷Ç t¸P Pèèõéæ ëëD÷Çğ t"ÿvÿv3ÀPèHÿ‹ğ‹ÆÀ}‹ÆéÃ VèÿYë#ëÿvÿvÿvüè&ÿ‹ğ‹ÆÀ}‹Æé¡ ëzÇFü  Wÿvÿvè• ƒÄ‹ğ‹ÆÀ|_3ÀPVèQYY‰Fş©€ t$Ï  ÷Ç €t‹Fş%ÿ   3ÒRP¸ PVè(ƒÄë
+÷Ç tVèÚşƒ~ü t÷Çğ t¸ P¸ PÿvÿvèXƒÄö|÷Ç t¸ ë3À‹×âÿøÂ‹ŞÑã‰‡@‹Æë _^‹å]ÃU‹ìV°‹N÷Á u
+°÷Á u° ÅV±ğ"N
+Á´=Í!r‹ğ‹F%ÿø €‹ŞÑã‰‡@‹ÆëPè³ôë ^]ÃU‹ìƒìVWÄ^&‹7‹şÄ^&÷G@ t‹Æë'Ä^&Ä_ŒFş‰^üëÄ^üÿFü&€?
+uG‹ÆNÀuì‹Çë _^‹å]Â U‹ìÿvÿvè3‹åÀt¸ÿÿëpƒ~uÄ^&ƒ? ~ÿvÿvèƒÿ™)FV
+Ä^&g_şÄ^&Ç  Ä^&‹W
+&‹GÄ^&‰W&‰Gÿvÿv
+ÿvÄ^&ŠG˜Pè’
+‹åƒúÿu
+=ÿÿu¸ÿÿë3Àë ]ÃU‹ìƒìÿvÿvè§YYÀtºÿÿ¸ÿÿëL¸ P3ÀPPÄ^&ŠG˜PèJ
+ƒÄ‰Vş‰FüÄ^&ƒ? ~‹Vş‹FüRPÿvÿvèÕş™‹Ø‹ÊXZ+ÃÑë‹Vş‹Füë ‹å]ÃU‹ìƒìV¾ Œ^şÇFü°ëÄ^ü&‹G% = uÿvşÿvüèYYƒFü‹ÆNÀuÛ^‹å]ÃU‹ìÄ^&÷G tè±ÿÄ^&ÿwÄ^&‹W
+&‹GÄ^&‰W&‰GRPÄ^&ŠG˜PèM‹åÄ^&‰À~Ä^&gßÿ3Àë7ë0Ä^&ƒ? uÄ^&‹G%ş  Ä^&‰GëÄ^&Ç  Ä^&O ¸ÿÿë ]Â U‹ìÄ^&ÿÿvÿvè ‹åë ]ÃU‹ìƒìÄ^&ÿ|Ä^&ÿG&Ä_K&Š´ é&Ä^&ÿ|Ä^&÷GtÄ^&O ¸ÿÿéÄ^&O€ Ä^&ƒ tÿvÿvèøşÀt¸ÿÿéŞ ëšéÙ ƒ>l uP‹F»°ŒÙ;ÃuDÄ^&ŠG˜Pèö YÀu	Ä^&gÿı¸ PÄ^&÷G t¸ ë3ÀP3ÀPPÿvÿvèÜ ƒÄé~ÿÄ^&÷G tèFş¸ PFÿPÄ^&ŠG˜Pè·ƒÄ= t6Ä^&ŠG˜PèøY= tÄ^&O ëÄ^&‹G%ş  Ä^&‰G¸ÿÿë!€~ÿuÄ^&÷G@ tÄ^&gßÿŠFÿ´ ë ‹å]Ã¸°Pè¬şYYë ÃU‹ì´DŠF‹^‹NÅVÍ!rƒ~ u‹ÂëëPèñë ]ÃU‹ì¸ D‹^Í!¸  rÑâÑĞë ]ÃU‹ìVW‹v‹~Ä^&‹G‹V;Âuƒÿşÿv¸ÿÿéƒ>n u‹F»ÄŒÙ;ÃuÇn ëƒ>l u‹F»°ŒÙ;ÃuÇl Ä^&ƒ? t¸ P3ÀPPÿvÿvèüƒÄ
+Ä^&÷G tÄ^&ÿw
+&ÿwè?YYÄ^&góÿÄ^&ÇG  ‹V‹F Ä^&‰W
+&‰GÄ^&‰W&‰Gƒÿtböv^Ç–Â?‹FF
+uVèÔñY‰V
+‰FĞtÄ^&O ë¸ÿÿë5‹V
+‹FÄ^&‰W&‰GÄ^&‰W
+&‰GÄ^&‰wƒÿu	Ä^&O 3Àë _^]ÃU‹ìV¾ÿÿÄ^&‹G‹V;Ât‹Æé© Ä^&ƒ t8Ä^&ƒ? }ÿvÿvè[
+YYÀt‹Æé‚ Ä^&÷G tÄ^&ÿw
+&ÿwèCYYÄ^&€ |Ä^&ŠG˜PèT Y‹ğÄ^&ÇG  Ä^&ÇG  Ä^&Ç  Ä^&ÆGÿÄ^&ƒ t3ÀPPÄ^&ÿwèäRPè†YYÄ^&ÇG  ‹Æë ^]ÃU‹ìV‹vö|ƒş|	¸ PèÕîë‹ŞÑãÇ‡@ÿÿVè Yë ^]ÃU‹ìV‹v´>‹ŞÍ!rÑãÇ‡@ÿÿ3ÀëPè îë ^]ÃU‹ìƒìV¾ Œ^şÇFüëÄ^ü&÷G tÿvşÿvüèÁşYYƒFüNuã^‹å]ÃU‹ìƒìV¾ Œ^şÇFü°ëÄ^ü&÷G tÿvşÿvüè	YYNƒFüöuá^‹å]ÃU‹ìVWéê ÿFÄ^&‹G;Fv‹~ëÄ^&‹Ä^&÷G@ uéo Ä^&ƒ teÄ^&‹G;FsYÄ^&ƒ? uPÿN3ÿëÄ^&‹GøÄ^&‹G)FÄ^&‹G;FváWÿvÿv
+Ä^&ŠG˜PèÀƒÄ‹ğv
+;÷t	‹Ç+ÆFë]ëRë‹ÆÄ^
+&ˆÿF
+ÿN‹FÀt4Ot1Ä^&ÿ|Ä^&ÿG&Ä_K&Š´ ‹ğëÿvÿvè±úYY‹ğ‹Æ=ÿÿu·ƒşÿuë	ƒ~ téÿ‹Fë _^]Â
+ U‹ìƒìVW‹vöu3Àëk‹Æ3Ò‹^
+3ÉšïE  ‰Vş‰Füƒúw'rÀs!ÿvÿvÿvüÿvÿvè¶şP‹FüZ+Â3Ò÷öë-ë+‹~
+GëvO‹ÇÀtÿvÿvVÿvÿvè‡şÀtâ‹F
++Çë _^‹å]ÃU‹ìƒìVW‹F
+@= r‹^Ñã÷‡@ t3Àé– ÿv
+ÿvÿvÿvè ƒÄ‰Fü‹Fü@= r‹^Ñã÷‡@ €t‹Füëf‹NüÄv‹ş‹Şü&¬<t.<tªâóëâïS¸ PFÿPÿvè> ƒÄ[üŠFÿª;ûuë’ë S¸ P÷ÙÀPQÿvè£ƒÄ‹^Ñã@ [‹Ç+Ãë _^‹å]ÃU‹ì´?‹^‹N
+ÅVÍ!rëPèÊëë ]ÃU‹ìƒìVW‹vöu‹F
+ëk‹Æ3Ò‹^
+3ÉšïE  ‰Vş‰Füƒúw'rÀs!ÿvÿvÿvüÿvÿvè/	P‹FüZ+Â3Ò÷öë-ë+‹~
+GëvO‹ÇÀtÿvÿvVÿvÿvè 	Àtâ‹F
++Çë _^‹å]ÃU‹ìì VW‹F
+@= s3ÀéC‹^Ñã÷‡@ €tÿv
+ÿvÿvÿvè-ƒÄé!‹^Ñã§@ÿıÄ^Œ†|ÿ‰zÿ‹F
+‰†vÿŒÓÃ~ÿŒ†tÿ‰rÿéŸ ÿvÿÄzÿÿ†zÿ&Šˆ†yÿ<
+uÄrÿ&Æÿ†rÿŠ†yÿÄrÿ&ˆÿ†rÿ‹†rÿŒÑ~ÿ3Ò+ÃƒÚ Ò|Xu=€ rQ‹†rÿŒÑ~ÿ3Ò+ÃƒÚ ‹ğV†~ÿPÿvè‰ ƒÄ‹ø‹Ç;Ætÿs¸ÿÿë‹F
++†vÿÇ+ÆëbŒÓÃ~ÿŒ†tÿ‰rÿƒ¾vÿ téWÿ‹†rÿŒÑ~ÿ3Ò+ÃƒÚ ‹ğ‹ÆÀv*V†~ÿPÿvè( ƒÄ‹ø‹Ç;Ætÿs¸ÿÿë‹F
+Ç+Æë‹F
+ë _^‹å]ÃU‹ì‹^Ñã÷‡@ t¸ P3ÀPPÿvèg ‹å´@‹^‹N
+ÅVÍ!rP‹^Ñã@ XëPèéë ]ÃU‹ìV3ÀPÿvÿvèºƒÄ‹ğƒşÿu‹Æë÷F t÷Æ u3ÀëÇ  ¸ÿÿë ^]ÃU‹ì‹^Ñã§@ÿı´BŠF
+‹^‹N‹VÍ!rëPè6é™ë ]ÃU‹ìƒì"VWÄ~
+‹^ƒû$w\€ûrW‹F‹NÉ}€~ t&Æ-G÷Ù÷ØƒÙ vŞã‘+Ò÷ó‘÷ó6ˆFã
+ëğ+Ò÷ó6ˆFÀuôNŞ÷ÙÎüN6Š,
+s:ëFªâî° ª‹V‹F
+ë _^‹å]Â U‹ìƒ~
+
+u‹F™ë‹F3ÒRPÿvÿvÿv
+°P°aPèTÿë ]ÃU‹ìÿvÿvÿv
+ÿvÿv° P°aPè5ÿë ]ÃU‹ìÿvÿvÿv
+ÿvÿvƒ~
+u¸ ë3ÀP°aPèÿë ]ÃV–’…Àt÷ã‘…Àt÷æÈ–÷ãÑ^ËU‹ì‹FFuŒ^ÇF”qÄ^&Æ ¸pPÿvÿvè™ ‹å¸
+ P‹V‹F RP‹F3ÒRPè[ÿ‹å¸tPÿvÿvèn ‹å‹V‹Fë ]Â U‹ìÿvÿvƒ>’qÿu¸ ë¸ ’q¡’qPè|ÿ‰V‰F3ÀPÿvÿvèğı‹å=ÿÿuÇ‹V‹Fë ]ÃU‹ì´AÅVÍ!r3ÀëPèbçë ]ÃU‹ìVWüÄ~‹×2À¹ÿÿò®uÿÄ~¹ÿÿò®÷Ñ+ù‡÷÷Æ t¤IÑéó¥s¤‹ÂŒÂë _^]ÃU‹ìVÅvŠ^÷Æ t	¬:Ãt"Àt­:Ãt"Àt:ãt"äuï3Ò3Àë	FDşŒÚë ^]ÃU‹ìVWüÄ~2À¹ÿÿò®‹Á÷ĞHë _^]ÃU‹ìVWŒÚü3À‹ØÄ~‹÷2À¹ÿÿò®÷Ñ‹şÅvó¦ŠDÿ&Š]ÿ+ÃÚë _^]ÃU‹ìVWüÄ~‹÷2À¹ÿÿò®÷ÑÄ~ó¤‹V‹Fë _^]ÃU‹ìVWŒÚÄ~Åv‹NÑéüó¥s¤Ú‹V‹Fë _^]ÃU‹ìVW‹N
+‹^‹V‹Fš¦4  sı¸ ëü3ÀÅvÄ~‹NÀtñNùO÷Ç tã¤I+ğ+øÑéó¥sğø¤ü_^]ÃU‹ìÿvÿvÿvÿv
+ÿvè—ÿ‹å‹V‹F]ÃU‹ì´CŠF‹N
+ÅVÍ!r‘ëPè´åë ]Ãºzëº¹ ´@» Í!¹' º„´@Í!é¹U‹ìƒì‹^Ñã÷‡@ t¸ ëR¸ D‹^Í!rAöÂ€u8¸B3É3ÒÍ!r1RP¸B3É3ÒÍ!‰Fü‰VşZYr¸ BÍ!r;Vşrw;Für¸ ë
+3ÀëPè'åë ‹å]ÃU‹ìVÄ^&‹G‹V;Ât¸ÿÿéË Ä^&ƒ? |eÄ^&÷G uÄ^&‹W&‹G‹N‹^ƒÃ;Ñu>;Ãu:Ä^&Ç  Ä^&‹W&‹G‹N‹^ƒÃ;Ñu;ÃuÄ^&‹W
+&‹GÄ^&‰W&‰G3Àë]Ä^&‹wÄ^&7FÄ^&)7VÄ^&‹W
+&‹GÄ^&‰W&‰GRPÄ^&ŠG˜Pè!ùƒÄ;ÆtÄ^&÷G uÄ^&O ¸ÿÿë3Àë ^]ÃU‹ì¸ÕKP¸ÄPÿvÿvFPèéë ]ÃU‹ìÄ^&ÿÿvÿvŠF˜Pè ‹åë ]ÃU‹ìƒìŠFˆFÿÄ^&ÿ}FŠFÿÄ^&ÿG&Ä_K&ˆÄ^&÷G t!€~ÿ
+t€~ÿuÿvÿvè™şYYÀt¸ÿÿé@ŠFÿ´ é8Ä^&ÿÄ^&÷G uÄ^&÷G uÄ^&O ¸ÿÿéÄ^&O Ä^&ƒ t8Ä^&ƒ? tÿvÿvè5şYYÀt¸ÿÿéÜ ëÄ^¸ÿÿ&‹W+ÂÄ^&‰é?ÿéÂ ƒ>n uP‹F»ÄŒÙ;ÃuDÄ^&ŠG˜PèòYÀu	Ä^&gÿı¸ PÄ^&÷G t¸ ë3ÀP3ÀPPÿvÿvè÷ñƒÄé^ÿ€~ÿ
+u(Ä^&÷G@ u¸ P¸¬PÄ^&ŠG˜PèÒøƒÄ= u¸ PFPÄ^&ŠG˜PèµøƒÄ= tÄ^&÷G uÄ^&O ¸ÿÿëŠFÿ´ ë ‹å]ÃU‹ìV‹v¸ÄPVèZşƒÄë ^]ÃU‹ìVW‹vFÄ^&÷G t*ëë N‹ÆÀtÿvÿvÄ^
+ÿF
+&Š˜PèşƒÄ=ÿÿuÛé£ Ä^&÷G@ tNÄ^&ƒ tDÄ^&‹G;Æs9Ä^&ƒ? tÿvÿvèÁüYYÀt3ÀëkNVÿvÿv
+Ä^&ŠG˜Pèã÷ƒÄ‹ø+÷ëJëë N‹ÆÀt?Ä^&ÿ}Ä^
+ÿF
+&ŠÄ^&ÿG&Ä_K&ˆ´ ëÿvÿvÄ^
+ÿF
+&ŠPè\ıƒÄ=ÿÿu¸‹Æë _^]Â
+ ÿ&,	U‹ì‹V¹»µüŠÆÒè×ªŠÆ"Å×ªŠÂÒè×ªŠÂ"Å×ªë ]Â U‹ìì– VWÇFª  ÆF­Pë=W¹ÿÿ2Àò®÷ÑI_Ã6ˆGşN­~&SQRF®+øF®PWÿvÿvÿVÆF­P~ª~®ZY[Ãü~®‰¾lÿ‹¾lÿÄv&¬
+Àt<%t6ˆGşN­íè³ÿëèé‰¶xÿ&¬<%tå‰¾lÿ3É‰vÿÇ†jÿ  ˆuÿÇ†pÿÿÿÇ†rÿÿÿë&¬2ä‹Ğ‹Ø€ë €û`sGŠŸÅ‹Ã= vé0‹ØÑã.ÿ§¾M	NñMJNıMrN|N¾NÈNØN0NOèNìNğN–OOPìOP¶QåQåQåQN&Néô€ı wøƒjÿëš€ı wìƒjÿë€ı wà€¾uÿ+tˆ–uÿé{ÿƒ¦jÿßµéqÿƒjÿ µégÿ€ı wG÷†jÿ u$ƒjÿµéPÿé›Ä~&‹ƒF€ıs	‰†pÿµé3ÿ€ıuŞ‰†rÿşÅé%ÿ€ısĞµéÿ’,0˜€ıwµ‡†pÿÀ|ÒÑà‹ĞÑàÑàÂ†pÿé÷ş€ıu¢‡†rÿÀ|´Ñà‹ĞÑàÑàÂ†rÿéÙşƒjÿµéÏşjÿ ƒ¦jÿïµé¿şƒ¦jÿïjÿ€ µé¯ş·ë
+·
+ë·³éÚÆ†uÿ Æ†oÿ ˆ–nÿÄ~&‹3Òë·
+Æ†oÿˆ–nÿÄ~&‹™GG‰v÷†jÿ t&‹GG‰~¾{ÿÀu3Òu/ƒ¾rÿ u-‹¾lÿ‹pÿãƒùÿt‹†jÿ% t²0ë² ŠÂè¥ıâùéİıƒjÿRPWŠÇ˜PŠ†oÿPSèpõ‹–rÿÒéé*ˆ–nÿ‰v¾zÿÄ^&ÿ7CC‰^÷†jÿ  t&ÿ7CC‰^èı°:ªèûü6Æ Æ†oÿ ƒ¦jÿûzÿ+ù‡Ï‹–rÿ;Ñ‹ÑéÄ ‰vˆ–nÿÄ~&‹ƒF¾{ÿ2ä&‰¹ éÜ ‰vˆ–nÿÄ~÷†jÿ  u&‹=ƒFÿë&Ä=ƒFŒÀÇu¿®èÁü;rÿv‹rÿé› ‰vˆ–nÿÄ~‹rÿÉ}¹ WQ{ÿSR¸ #†jÿP‹†jÿ©€ t
+¸ ÇFş ë© t
+¸ ÇFş
+ ëÇFş ¸ Pèü‹FşF¾{ÿ÷†jÿ t‹–pÿÒ~è@ü+Ñ~‰–vÿŠ†uÿ
+Àt&€=-tƒ®vÿƒ–vÿ O&ˆèü‹÷‹¾lÿ‹pÿ¸ #†jÿ= uŠ¦nÿ€üouƒ¾vÿ Ç†vÿ ë€üxt€üXuƒjÿ@KKƒ®vÿ}Ç†vÿ  vÿ÷†jÿ uë° èÆûK;Ùö÷†jÿ@ t°0è´ûŠ†nÿè­û‹–vÿÒ~'+Ê+Ú&Š<-t< t<+u&¬èûIK‡Êã°0è‚ûâù‡Êã+Ù&¬6ˆGşN­èuûâğÛ~	‹Ë° è_ûâùé—û‰vÄ~÷†jÿ  u&‹=ƒFë&Ä=ƒF¸P *F­Fª&‰édû‹¶xÿF
+‹¾lÿ°%èû&¬
+Àu÷€~­P}èû‹Fªë _^‹å]Â U‹ìÿvÿvèÀ‹å]ÃU‹ìƒì3É3Û‹ª¡¨š¦4  tVÄ¨&Ä_ŒFş‰^ü‹V‹FÄ¨&‰W&‰G‹V‹FÄ^ü&‰W
+&‰G‹Vş‹FüÄ^&‰W&‰G‹ª¡¨Ä^&‰W
+&‰Gë-Ä^Œª‰¨‹V‹FÄ^&‰W
+&‰G‹V‹FÄ^&‰W&‰G‹å]ÃU‹ìƒìÄ^&‹W&‹Ä^&&W‹N
+‹^‹¦¡¤š¦4  uÄ^Œ¦‰¤ë,Ä^&‹O&‹‹V
+‹FšK4  ‰Vş‰Fü‹V‹FÄ^ü&‰W&‰Gÿv
+ÿvè×ÜYY‹å]ÃU‹ìƒì‹¦‹¤‹¢¡ š¦4  u*ÿ6¢ÿ6 è+àYYÇ¦  Ç¤  3ÛÃ3ÛŒ¢‰ é“ Ä¤&Ä_ŒFş‰^üÄ^ü&‹W&‹% â  ĞuXÿvşÿvüè_ÜYY‹¢‹ ‹Vş‹Füš¦4  uÇ¦  Ç¤  3ÛÃ3ÛŒ¢‰ ëÄ^ü&Ä_Œ¦‰¤ÿvşÿvüè•ßYYëÿ6¦ÿ6¤è†ßYYÄ^üŒ¦‰¤‹å]ÃU‹ìƒìÄ^&ƒ/&ƒ_ Ä^&‹O&‹‹V‹FšK4  ‰Vú‰FøÄ^&Ä_ŒFş‰^üÄ^ü&‹W&‹% â  ĞuE‹¢‹ ‹V‹Fš¦4  t0Ä^&‹W&‹Ä^ü&&W‹Vş‹FüÄ^ø&‰W&‰GÄ^üŒF‰^ëÿvÿvèqıYYÄ^ø&‹W&‹% â  ĞuÿvúÿvøÿvÿvèêıƒÄ‹å]ÃU‹ì‹FFuë9‹V‹F¹ÿÿ»øÿšK4  ‰V‰F‹V‹F;¦u;¤uè şëÿvÿvèòş‹å]ÃU‹ì¸ÕKPÿvÿvÿv
+ÿvFPè®÷ë ]Ã3Éë¹ ë¹ ë¹ UVW‹ì‹ù‹F
+‹V‹^‹NÉuÒtiÛte÷Ç uÒy
+÷Ú÷ØƒÚ ƒÏÉy
+÷Ù÷ÛƒÙ ƒ÷‹é¹  W3ÿ3öÑàÑÒÑÖÑ×;ırw;ór+óı@âç[÷Ã t‹Æ‹×Ñë÷Ã t÷Ú÷ØƒÚ _^]Ê ÷ó÷Ç t‹Â3Òëì€ùs‹ØÓàÓâöÙ€ÁÓëÓË€é‹Ğ3ÀÓâË€ùs‹ÚÓèÓêöÙ€ÁÓãÃË€é‹Â3ÒÓèËU‹ìVW‹NãÅvÄ~üó¦ŠDÿ2ä&ŠMÿ2í+Áë3Àëù_^]ÃStack overflow!
+$ŒÈØºRV´	Í!é’ªU‹ìVW´VÅVÄ~Í!r3ÀëPèš×ë _^]ÃU‹ì3ÀP3ÀPPÿvÿvè!ã‹åÀu	Ä^&gïÿ]ÃU‹ìƒìë0Ä^ŒFş‰^üëÄ^&ŠÄ^ü&:u‹V‹FëÿFüÄ^ü&€? uŞÿFÄ^&€? uÇ3Ò3Àë ‹å]ÃU‹ìƒ~ÿu¸ÿÿë!ŠF´ ‹Øö‡¯tŠF´ àÿë	ëŠF´ ë ]ÃU‹ì¸ÕKPÿvÿvÿv
+ÿvÿvÿvè õë ]Ã                 Turbo-C - Copyright (c) 1988 Borland Intl. Divide error
+Abnormal program termination
+                                                         ˜ var -- compression archiver -- written by Haruhiko Okumura
+  PC-VAN:SCIENCE        CompuServe:74050,1022
+  NIFTY-Serve:PAF01022  INTERNET:74050.1022@compuserve.com
+Usage: ar command archive [file ...]
+Commands:
+   a: Add files to archive (replace if present)
+   x: Extract files from archive
+   r: Replace files in archive
+   d: Delete files from archive
+   p: Print files on standard output
+   l: List contents of archive
+If no files are named, all files in archive are processed,
+   except for commands 'a' and 'd'.
+You may copy, distribute, and rewrite this program freely.
+ Header sum error Can't read Can't write rb Can't open %s
+ Replacing %s  Adding %s  -lh5-            %d.%d%%
+ wb Can't open %s
+New filename:  Not extracted
+ Extracting %s  ===== %s =====
+ 045 -lh - Unknown method: %u
+ There's an extended header of size %u.
+ Can't read Can't read 
+ CRC error
+ Filename         Original Compressed Ratio CRC Method
+ %-14s 
+                %10lu %10lu %u.%03u %04X %5.5s
+ AXRDPL AD *? Filenames may not contain '*' and '?' rb Can't open archive '%s' ARD wb Can't open temporary file Can't write   %d files
+  Unable to write     Out of memory.    17  Bad table   Out of memory.     ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ#ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ#ÿÿÿÿ#ÿÿ b.b.b.                           !!!!!                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                    	              °  
+             Ä               Ø  C             ì  B                  ÿ                 ÿ             (    ÿ             <    ÿ             P    ÿ             d    ÿ             x    ÿ             Œ    ÿ                  ÿ             ´    ÿ             È    ÿ             Ü    ÿ             ğ    ÿ                 ÿ                 ÿ             ,     ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ @ÿÿ    TMP .$$$  print scanf : floating point formats not linked
+  (null) 0123456789ABCDEF  	
+
+ ””›wH|H|H|H/***********************************************************
+	ar.h
+***********************************************************/
+#include <stdio.h>
+#include <limits.h>
+typedef unsigned char  uchar;   /*  8 bits or more */
+typedef unsigned int   uint;    /* 16 bits or more */
+typedef unsigned short ushort;  /* 16 bits or more */
+typedef unsigned long  ulong;   /* 32 bits or more */
+
+/* ar.c */
+
+extern int unpackable;
+extern ulong origsize, compsize;
+
+/* io.c */
+
+#define INIT_CRC  0  /* CCITT: 0xFFFF */
+extern FILE *arcfile, *infile, *outfile;
+extern uint crc, bitbuf;
+#define BITBUFSIZ (CHAR_BIT * sizeof bitbuf)
+
+void error(char *fmt, ...);
+void make_crctable(void);
+void fillbuf(int n);
+uint getbits(int n);
+/* void putbit(int bit); */
+void putbits(int n, uint x);
+int fread_crc(uchar *p, int n, FILE *f);
+void fwrite_crc(uchar *p, int n, FILE *f);
+void init_getbits(void);
+void init_putbits(void);
+
+/* encode.c and decode.c */
+
+#define DICBIT    13    /* 12(-lh4-) or 13(-lh5-) */
+#define DICSIZ (1U << DICBIT)
+#define MATCHBIT   8    /* bits for MAXMATCH - THRESHOLD */
+#define MAXMATCH 256    /* formerly F (not more than UCHAR_MAX + 1) */
+#define THRESHOLD  3    /* choose optimal value */
+#define PERC_FLAG 0x8000U
+
+void encode(void);
+void decode_start(void);
+void decode(uint count, uchar text[]);
+
+/* huf.c */
+
+#define NC (UCHAR_MAX + MAXMATCH + 2 - THRESHOLD)
+	/* alphabet = {0, 1, 2, ..., NC - 1} */
+#define CBIT 9  /* $\lfloor \log_2 NC \rfloor + 1$ */
+#define CODE_BIT  16  /* codeword length */
+
+extern ushort left[], right[];
+
+void huf_encode_start(void);
+void huf_decode_start(void);
+uint decode_c(void);
+uint decode_p(void);
+void output(uint c, uint p);
+void huf_encode_end(void);
+
+/* maketbl.c */
+
+void make_table(int nchar, uchar bitlen[],
+				int tablebits, ushort table[]);
+
+/* maketree.c */
+
+int make_tree(int nparm, ushort freqparm[],
+				uchar lenparm[], ushort codeparm[]);
+/***********************************************************
+	decode.c
+***********************************************************/
+#include "ar.h"
+
+static int j;  /* remaining bytes to copy */
+
+void decode_start(void)
+{
+	huf_decode_start();
+	j = 0;
+}
+
+void decode(uint count, uchar buffer[])
+	/* The calling function must keep the number of
+	   bytes to be processed.  This function decodes
+	   either 'count' bytes or 'DICSIZ' bytes, whichever
+	   is smaller, into the array 'buffer[]' of size
+	   'DICSIZ' or more.
+	   Call decode_start() once for each new file
+	   before calling this function. */
+{
+	static uint i;
+	uint r, c;
+
+	r = 0;
+	while (--j >= 0) {
+		buffer[r] = buffer[i];
+		i = (i + 1) & (DICSIZ - 1);
+		if (++r == count) return;
+	}
+	for ( ; ; ) {
+		c = decode_c();
+		if (c <= UCHAR_MAX) {
+			buffer[r] = c;
+			if (++r == count) return;
+		} else {
+			j = c - (UCHAR_MAX + 1 - THRESHOLD);
+			i = (r - decode_p() - 1) & (DICSIZ - 1);
+			while (--j >= 0) {
+				buffer[r] = buffer[i];
+				i = (i + 1) & (DICSIZ - 1);
+				if (++r == count) return;
+			}
+		}
+	}
+}
+/***********************************************************
+	encode.c -- sliding dictionary with percolating update
+***********************************************************/
+#include "ar.h"
+#include <stdlib.h>
+#include <string.h>  /* memmove() */
+
+#define PERCOLATE  1
+#define NIL        0
+#define MAX_HASH_VAL (3 * DICSIZ + (DICSIZ / 512 + 1) * UCHAR_MAX)
+
+typedef short node;
+
+static uchar *text, *childcount;
+static node pos, matchpos, avail,
+	*position, *parent, *prev, *next = NULL;
+static int remainder, matchlen;
+
+#if MAXMATCH <= (UCHAR_MAX + 1)
+	static uchar *level;
+#else
+	static ushort *level;
+#endif
+
+static void allocate_memory(void)
+{
+	if (next != NULL) return;
+    text = malloc(DICSIZ * 2 + MAXMATCH);
+	level      = malloc((DICSIZ + UCHAR_MAX + 1) * sizeof(*level));
+	childcount = malloc((DICSIZ + UCHAR_MAX + 1) * sizeof(*childcount));
+	#if PERCOLATE
+	  position = malloc((DICSIZ + UCHAR_MAX + 1) * sizeof(*position));
+	#else
+	  position = malloc(DICSIZ * sizeof(*position));
+	#endif
+	parent     = malloc(DICSIZ * 2 * sizeof(*parent));
+	prev       = malloc(DICSIZ * 2 * sizeof(*prev));
+	next       = malloc((MAX_HASH_VAL + 1) * sizeof(*next));
+	if (next == NULL) error("Out of memory.");
+}
+
+static void init_slide(void)
+{
+	node i;
+
+	for (i = DICSIZ; i <= DICSIZ + UCHAR_MAX; i++) {
+		level[i] = 1;
+		#if PERCOLATE
+			position[i] = NIL;  /* sentinel */
+		#endif
+	}
+	for (i = DICSIZ; i < DICSIZ * 2; i++) parent[i] = NIL;
+	avail = 1;
+	for (i = 1; i < DICSIZ - 1; i++) next[i] = i + 1;
+	next[DICSIZ - 1] = NIL;
+	for (i = DICSIZ * 2; i <= MAX_HASH_VAL; i++) next[i] = NIL;
+}
+
+#define HASH(p, c) ((p) + ((c) << (DICBIT - 9)) + DICSIZ * 2)
+
+static node child(node q, uchar c)
+	/* q's child for character c (NIL if not found) */
+{
+	node r;
+
+	r = next[HASH(q, c)];
+	parent[NIL] = q;  /* sentinel */
+	while (parent[r] != q) r = next[r];
+	return r;
+}
+
+static void makechild(node q, uchar c, node r)
+	/* Let r be q's child for character c. */
+{
+	node h, t;
+
+	h = HASH(q, c);
+	t = next[h];  next[h] = r;  next[r] = t;
+	prev[t] = r;  prev[r] = h;
+	parent[r] = q;  childcount[q]++;
+}
+
+void split(node old)
+{
+	node new, t;
+
+	new = avail;  avail = next[new];  childcount[new] = 0;
+	t = prev[old];  prev[new] = t;  next[t] = new;
+	t = next[old];  next[new] = t;  prev[t] = new;
+	parent[new] = parent[old];
+	level[new] = matchlen;
+	position[new] = pos;
+	makechild(new, text[matchpos + matchlen], old);
+	makechild(new, text[pos + matchlen], pos);
+}
+
+static void insert_node(void)
+{
+	node q, r, j, t;
+	uchar c, *t1, *t2;
+
+	if (matchlen >= 4) {
+		matchlen--;
+		r = (matchpos + 1) | DICSIZ;
+		while ((q = parent[r]) == NIL) r = next[r];
+		while (level[q] >= matchlen) {
+			r = q;  q = parent[q];
+		}
+		#if PERCOLATE
+			t = q;
+			while (position[t] < 0) {
+				position[t] = pos;  t = parent[t];
+			}
+			if (t < DICSIZ) position[t] = pos | PERC_FLAG;
+		#else
+			t = q;
+			while (t < DICSIZ) {
+				position[t] = pos;  t = parent[t];
+			}
+		#endif
+	} else {
+		q = text[pos] + DICSIZ;  c = text[pos + 1];
+		if ((r = child(q, c)) == NIL) {
+			makechild(q, c, pos);  matchlen = 1;
+			return;
+		}
+		matchlen = 2;
+	}
+	for ( ; ; ) {
+		if (r >= DICSIZ) {
+			j = MAXMATCH;  matchpos = r;
+		} else {
+			j = level[r];
+			matchpos = position[r] & ~PERC_FLAG;
+		}
+		if (matchpos >= pos) matchpos -= DICSIZ;
+		t1 = &text[pos + matchlen];  t2 = &text[matchpos + matchlen];
+		while (matchlen < j) {
+			if (*t1 != *t2) {  split(r);  return;  }
+			matchlen++;  t1++;  t2++;
+		}
+		if (matchlen >= MAXMATCH) break;
+		position[r] = pos;
+		q = r;
+		if ((r = child(q, *t1)) == NIL) {
+			makechild(q, *t1, pos);  return;
+		}
+		matchlen++;
+	}
+	t = prev[r];  prev[pos] = t;  next[t] = pos;
+	t = next[r];  next[pos] = t;  prev[t] = pos;
+	parent[pos] = q;  parent[r] = NIL;
+	next[r] = pos;  /* special use of next[] */
+}
+
+static void delete_node(void)
+{
+	#if PERCOLATE
+		node q, r, s, t, u;
+	#else
+		node r, s, t, u;
+	#endif
+
+	if (parent[pos] == NIL) return;
+	r = prev[pos];  s = next[pos];
+	next[r] = s;  prev[s] = r;
+	r = parent[pos];  parent[pos] = NIL;
+	if (r >= DICSIZ || --childcount[r] > 1) return;
+	#if PERCOLATE
+		t = position[r] & ~PERC_FLAG;
+	#else
+		t = position[r];
+	#endif
+	if (t >= pos) t -= DICSIZ;
+	#if PERCOLATE
+		s = t;  q = parent[r];
+		while ((u = position[q]) & PERC_FLAG) {
+			u &= ~PERC_FLAG;  if (u >= pos) u -= DICSIZ;
+			if (u > s) s = u;
+			position[q] = (s | DICSIZ);  q = parent[q];
+		}
+		if (q < DICSIZ) {
+			if (u >= pos) u -= DICSIZ;
+			if (u > s) s = u;
+			position[q] = s | DICSIZ | PERC_FLAG;
+		}
+	#endif
+	s = child(r, text[t + level[r]]);
+	t = prev[s];  u = next[s];
+	next[t] = u;  prev[u] = t;
+	t = prev[r];  next[t] = s;  prev[s] = t;
+	t = next[r];  prev[t] = s;  next[s] = t;
+	parent[s] = parent[r];  parent[r] = NIL;
+	next[r] = avail;  avail = r;
+}
+
+static void get_next_match(void)
+{
+	int n;
+
+	remainder--;
+	if (++pos == DICSIZ * 2) {
+		memmove(&text[0], &text[DICSIZ], DICSIZ + MAXMATCH);
+		n = fread_crc(&text[DICSIZ + MAXMATCH], DICSIZ, infile);
+		remainder += n;  pos = DICSIZ;  putc('.', stderr);
+	}
+	delete_node();  insert_node();
+}
+
+void encode(void)
+{
+	int lastmatchlen;
+	node lastmatchpos;
+
+	allocate_memory();  init_slide();  huf_encode_start();
+	remainder = fread_crc(&text[DICSIZ], DICSIZ + MAXMATCH, infile);
+	putc('.', stderr);
+	matchlen = 0;
+	pos = DICSIZ;  insert_node();
+	if (matchlen > remainder) matchlen = remainder;
+	while (remainder > 0 && ! unpackable) {
+		lastmatchlen = matchlen;  lastmatchpos = matchpos;
+		get_next_match();
+		if (matchlen > remainder) matchlen = remainder;
+		if (matchlen > lastmatchlen || lastmatchlen < THRESHOLD)
+			output(text[pos - 1], 0);
+		else {
+			output(lastmatchlen + (UCHAR_MAX + 1 - THRESHOLD),
+				   (pos - lastmatchpos - 2) & (DICSIZ - 1));
+			while (--lastmatchlen > 0) get_next_match();
+			if (matchlen > remainder) matchlen = remainder;
+		}
+	}
+	huf_encode_end();
+}
+/***********************************************************
+	huf.c -- static Huffman
+***********************************************************/
+#include <stdlib.h>
+#include "ar.h"
+
+#define NP (DICBIT + 1)
+#define NT (CODE_BIT + 3)
+#define PBIT 4  /* smallest integer such that (1U << PBIT) > NP */
+#define TBIT 5  /* smallest integer such that (1U << TBIT) > NT */
+#if NT > NP
+	#define NPT NT
+#else
+	#define NPT NP
+#endif
+
+ushort left[2 * NC - 1], right[2 * NC - 1];
+static uchar *buf, c_len[NC], pt_len[NPT];
+static uint   bufsiz = 0, blocksize;
+static ushort c_freq[2 * NC - 1], c_table[4096], c_code[NC],
+			  p_freq[2 * NP - 1], pt_table[256], pt_code[NPT],
+			  t_freq[2 * NT - 1];
+
+/***** encoding *****/
+
+static void count_t_freq(void)
+{
+	int i, k, n, count;
+
+	for (i = 0; i < NT; i++) t_freq[i] = 0;
+	n = NC;
+	while (n > 0 && c_len[n - 1] == 0) n--;
+	i = 0;
+	while (i < n) {
+		k = c_len[i++];
+		if (k == 0) {
+			count = 1;
+			while (i < n && c_len[i] == 0) {  i++;  count++;  }
+			if (count <= 2) t_freq[0] += count;
+			else if (count <= 18) t_freq[1]++;
+			else if (count == 19) {  t_freq[0]++;  t_freq[1]++;  }
+			else t_freq[2]++;
+		} else t_freq[k + 2]++;
+	}
+}
+
+static void write_pt_len(int n, int nbit, int i_special)
+{
+	int i, k;
+
+	while (n > 0 && pt_len[n - 1] == 0) n--;
+	putbits(nbit, n);
+	i = 0;
+	while (i < n) {
+		k = pt_len[i++];
+		if (k <= 6) putbits(3, k);
+		else putbits(k - 3, (1U << (k - 3)) - 2);
+		if (i == i_special) {
+			while (i < 6 && pt_len[i] == 0) i++;
+			putbits(2, (i - 3) & 3);
+		}
+	}
+}
+
+static void write_c_len(void)
+{
+	int i, k, n, count;
+
+	n = NC;
+	while (n > 0 && c_len[n - 1] == 0) n--;
+	putbits(CBIT, n);
+	i = 0;
+	while (i < n) {
+		k = c_len[i++];
+		if (k == 0) {
+			count = 1;
+			while (i < n && c_len[i] == 0) {  i++;  count++;  }
+			if (count <= 2) {
+				for (k = 0; k < count; k++)
+					putbits(pt_len[0], pt_code[0]);
+			} else if (count <= 18) {
+				putbits(pt_len[1], pt_code[1]);
+				putbits(4, count - 3);
+			} else if (count == 19) {
+				putbits(pt_len[0], pt_code[0]);
+				putbits(pt_len[1], pt_code[1]);
+				putbits(4, 15);
+			} else {
+				putbits(pt_len[2], pt_code[2]);
+				putbits(CBIT, count - 20);
+			}
+		} else putbits(pt_len[k + 2], pt_code[k + 2]);
+	}
+}
+
+static void encode_c(int c)
+{
+	putbits(c_len[c], c_code[c]);
+}
+
+static void encode_p(uint p)
+{
+	uint c, q;
+
+	c = 0;  q = p;  while (q) {  q >>= 1;  c++;  }
+	putbits(pt_len[c], pt_code[c]);
+	if (c > 1) putbits(c - 1, p & (0xFFFFU >> (17 - c)));
+}
+
+static void send_block(void)
+{
+	uint i, k, flags, root, pos, size;
+
+	root = make_tree(NC, c_freq, c_len, c_code);
+	size = c_freq[root];  putbits(16, size);
+	if (root >= NC) {
+		count_t_freq();
+		root = make_tree(NT, t_freq, pt_len, pt_code);
+		if (root >= NT) {
+			write_pt_len(NT, TBIT, 3);
+		} else {
+			putbits(TBIT, 0);  putbits(TBIT, root);
+		}
+		write_c_len();
+	} else {
+        putbits(TBIT, 0);  putbits(TBIT, 0);
+		putbits(CBIT, 0);  putbits(CBIT, root);
+	}
+	root = make_tree(NP, p_freq, pt_len, pt_code);
+	if (root >= NP) {
+		write_pt_len(NP, PBIT, -1);
+	} else {
+		putbits(PBIT, 0);  putbits(PBIT, root);
+	}
+	pos = 0;
+	for (i = 0; i < size; i++) {
+		if (i % CHAR_BIT == 0) flags = buf[pos++];  else flags <<= 1;
+		if (flags & (1U << (CHAR_BIT - 1))) {
+			encode_c(buf[pos++] + (1U << CHAR_BIT));
+			k = buf[pos++] << CHAR_BIT;  k += buf[pos++];
+			encode_p(k);
+		} else encode_c(buf[pos++]);
+		if (unpackable) return;
+	}
+	for (i = 0; i < NC; i++) c_freq[i] = 0;
+	for (i = 0; i < NP; i++) p_freq[i] = 0;
+}
+
+static uint output_pos, output_mask;
+
+void output(uint c, uint p)
+{
+	static uint cpos;
+
+	if ((output_mask >>= 1) == 0) {
+		output_mask = 1U << (CHAR_BIT - 1);
+		if (output_pos >= bufsiz - 3 * CHAR_BIT) {
+			send_block();
+			if (unpackable) return;
+			output_pos = 0;
+		}
+		cpos = output_pos++;  buf[cpos] = 0;
+	}
+	buf[output_pos++] = (uchar) c;  c_freq[c]++;
+	if (c >= (1U << CHAR_BIT)) {
+		buf[cpos] |= output_mask;
+		buf[output_pos++] = (uchar)(p >> CHAR_BIT);
+		buf[output_pos++] = (uchar) p;
+		c = 0;  while (p) {  p >>= 1;  c++;  }
+		p_freq[c]++;
+	}
+}
+
+void huf_encode_start(void)
+{
+	int i;
+
+	if (bufsiz == 0) {
+		bufsiz = 16 * 1024U;
+		while ((buf = malloc(bufsiz)) == NULL) {
+			bufsiz = (bufsiz / 10U) * 9U;
+			if (bufsiz < 4 * 1024U) error("Out of memory.");
+		}
+	}
+	buf[0] = 0;
+	for (i = 0; i < NC; i++) c_freq[i] = 0;
+	for (i = 0; i < NP; i++) p_freq[i] = 0;
+	output_pos = output_mask = 0;
+	init_putbits();
+}
+
+void huf_encode_end(void)
+{
+	if (! unpackable) {
+		send_block();
+		putbits(CHAR_BIT - 1, 0);  /* flush remaining bits */
+	}
+}
+
+/***** decoding *****/
+
+static void read_pt_len(int nn, int nbit, int i_special)
+{
+	int i, c, n;
+	uint mask;
+
+	n = getbits(nbit);
+	if (n == 0) {
+		c = getbits(nbit);
+		for (i = 0; i < nn; i++) pt_len[i] = 0;
+		for (i = 0; i < 256; i++) pt_table[i] = c;
+	} else {
+		i = 0;
+		while (i < n) {
+			c = bitbuf >> (BITBUFSIZ - 3);
+			if (c == 7) {
+				mask = 1U << (BITBUFSIZ - 1 - 3);
+				while (mask & bitbuf) {  mask >>= 1;  c++;  }
+			}
+			fillbuf((c < 7) ? 3 : c - 3);
+			pt_len[i++] = c;
+			if (i == i_special) {
+				c = getbits(2);
+				while (--c >= 0) pt_len[i++] = 0;
+			}
+		}
+		while (i < nn) pt_len[i++] = 0;
+		make_table(nn, pt_len, 8, pt_table);
+	}
+}
+
+static void read_c_len(void)
+{
+	int i, c, n;
+	uint mask;
+
+	n = getbits(CBIT);
+	if (n == 0) {
+		c = getbits(CBIT);
+		for (i = 0; i < NC; i++) c_len[i] = 0;
+		for (i = 0; i < 4096; i++) c_table[i] = c;
+	} else {
+		i = 0;
+		while (i < n) {
+			c = pt_table[bitbuf >> (BITBUFSIZ - 8)];
+			if (c >= NT) {
+				mask = 1U << (BITBUFSIZ - 1 - 8);
+				do {
+					if (bitbuf & mask) c = right[c];
+					else               c = left [c];
+					mask >>= 1;
+				} while (c >= NT);
+			}
+			fillbuf(pt_len[c]);
+			if (c <= 2) {
+				if      (c == 0) c = 1;
+				else if (c == 1) c = getbits(4) + 3;
+				else             c = getbits(CBIT) + 20;
+				while (--c >= 0) c_len[i++] = 0;
+			} else c_len[i++] = c - 2;
+		}
+		while (i < NC) c_len[i++] = 0;
+		make_table(NC, c_len, 12, c_table);
+	}
+}
+
+uint decode_c(void)
+{
+	uint j, mask;
+
+	if (blocksize == 0) {
+		blocksize = getbits(16);
+		read_pt_len(NT, TBIT, 3);
+		read_c_len();
+		read_pt_len(NP, PBIT, -1);
+	}
+	blocksize--;
+	j = c_table[bitbuf >> (BITBUFSIZ - 12)];
+	if (j >= NC) {
+		mask = 1U << (BITBUFSIZ - 1 - 12);
+		do {
+			if (bitbuf & mask) j = right[j];
+			else               j = left [j];
+			mask >>= 1;
+		} while (j >= NC);
+	}
+	fillbuf(c_len[j]);
+	return j;
+}
+
+uint decode_p(void)
+{
+	uint j, mask;
+
+	j = pt_table[bitbuf >> (BITBUFSIZ - 8)];
+	if (j >= NP) {
+		mask = 1U << (BITBUFSIZ - 1 - 8);
+		do {
+			if (bitbuf & mask) j = right[j];
+			else               j = left [j];
+			mask >>= 1;
+		} while (j >= NP);
+	}
+	fillbuf(pt_len[j]);
+	if (j != 0) j = (1U << (j - 1)) + getbits(j - 1);
+	return j;
+}
+
+void huf_decode_start(void)
+{
+	init_getbits();  blocksize = 0;
+}
+/***********************************************************
+	io.c -- input/output
+***********************************************************/
+#include "ar.h"
+#include <stdlib.h>
+#include <stdarg.h>
+
+#define CRCPOLY  0xA001  /* ANSI CRC-16 */
+                         /* CCITT: 0x8408 */
+#define UPDATE_CRC(c) \
+	crc = crctable[(crc ^ (c)) & 0xFF] ^ (crc >> CHAR_BIT)
+
+FILE *arcfile, *infile, *outfile;
+uint crc, bitbuf;
+
+static ushort crctable[UCHAR_MAX + 1];
+static uint  subbitbuf;
+static int   bitcount;
+
+void error(char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	putc('\n', stderr);
+	vfprintf(stderr, fmt, args);
+	putc('\n', stderr);
+	va_end(args);
+	exit(EXIT_FAILURE);
+}
+
+void make_crctable(void)
+{
+	uint i, j, r;
+
+	for (i = 0; i <= UCHAR_MAX; i++) {
+		r = i;
+		for (j = 0; j < CHAR_BIT; j++)
+			if (r & 1) r = (r >> 1) ^ CRCPOLY;
+			else       r >>= 1;
+		crctable[i] = r;
+	}
+}
+
+void fillbuf(int n)  /* Shift bitbuf n bits left, read n bits */
+{
+	bitbuf <<= n;
+	while (n > bitcount) {
+		bitbuf |= subbitbuf << (n -= bitcount);
+		if (compsize != 0) {
+			compsize--;  subbitbuf = (uchar) getc(arcfile);
+		} else subbitbuf = 0;
+		bitcount = CHAR_BIT;
+	}
+	bitbuf |= subbitbuf >> (bitcount -= n);
+}
+
+uint getbits(int n)
+{
+	uint x;
+
+	x = bitbuf >> (BITBUFSIZ - n);  fillbuf(n);
+	return x;
+}
+
+void putbits(int n, uint x)  /* Write rightmost n bits of x */
+{
+	if (n < bitcount) {
+		subbitbuf |= x << (bitcount -= n);
+	} else {
+		if (compsize < origsize) {
+			putc(subbitbuf | (x >> (n -= bitcount)), outfile);
+			compsize++;
+		} else unpackable = 1;
+		if (n < CHAR_BIT) {
+			subbitbuf = x << (bitcount = CHAR_BIT - n);
+		} else {
+			if (compsize < origsize) {
+				putc(x >> (n - CHAR_BIT), outfile);
+				compsize++;
+			} else unpackable = 1;
+			subbitbuf = x << (bitcount = 2 * CHAR_BIT - n);
+		}
+	}
+}
+
+int fread_crc(uchar *p, int n, FILE *f)
+{
+	int i;
+
+	i = n = fread(p, 1, n, f);  origsize += n;
+	while (--i >= 0) UPDATE_CRC(*p++);
+	return n;
+}
+
+void fwrite_crc(uchar *p, int n, FILE *f)
+{
+	if (fwrite(p, 1, n, f) < n) error("Unable to write");
+	while (--n >= 0) UPDATE_CRC(*p++);
+}
+
+void init_getbits(void)
+{
+	bitbuf = 0;  subbitbuf = 0;  bitcount = 0;
+	fillbuf(BITBUFSIZ);
+}
+
+void init_putbits(void)
+{
+	bitcount = CHAR_BIT;  subbitbuf = 0;
+}
+########################################
+#  'ar' -- compression archiver        #
+#  makefile for Turbo C compact model  #
+########################################
+
+MDL  = c  ##### compact model #####
+OBJS = ar.obj io.obj encode.obj decode.obj maketree.obj maketbl.obj huf.obj
+
+ar.exe: $(OBJS)
+	tlink /c /d /x a:\tc\lib\c0$(MDL) \
+	ar io encode decode maketree maketbl huf, ar, , a:\tc\lib\c$(MDL)
+
+.c.obj:
+	tcc -c -m$(MDL) -N -w -w-stv -Ia:\tc\include $<
+
+$(OBJS): ar.h
+/***********************************************************
+	maketbl.c -- make table for decoding
+***********************************************************/
+#include "ar.h"
+
+void make_table(int nchar, uchar bitlen[], int tablebits, ushort table[])
+{
+	ushort count[17], weight[17], start[18], *p;
+	uint i, k, len, ch, jutbits, avail, nextcode, mask;
+
+	for (i = 1; i <= 16; i++) count[i] = 0;
+	for (i = 0; i < nchar; i++) count[bitlen[i]]++;
+
+	start[1] = 0;
+	for (i = 1; i <= 16; i++)
+		start[i + 1] = start[i] + (count[i] << (16 - i));
+	if (start[17] != (ushort)(1U << 16)) error("Bad table");
+
+	jutbits = 16 - tablebits;
+	for (i = 1; i <= tablebits; i++) {
+		start[i] >>= jutbits;
+		weight[i] = 1U << (tablebits - i);
+	}
+	while (i <= 16) weight[i++] = 1U << (16 - i);
+
+	i = start[tablebits + 1] >> jutbits;
+	if (i != (ushort)(1U << 16)) {
+		k = 1U << tablebits;
+		while (i != k) table[i++] = 0;
+	}
+
+	avail = nchar;
+	mask = 1U << (15 - tablebits);
+	for (ch = 0; ch < nchar; ch++) {
+		if ((len = bitlen[ch]) == 0) continue;
+		nextcode = start[len] + weight[len];
+		if (len <= tablebits) {
+			for (i = start[len]; i < nextcode; i++) table[i] = ch;
+		} else {
+			k = start[len];
+			p = &table[k >> jutbits];
+			i = len - tablebits;
+			while (i != 0) {
+				if (*p == 0) {
+					right[avail] = left[avail] = 0;
+					*p = avail++;
+				}
+				if (k & mask) p = &right[*p];
+				else          p = &left[*p];
+				k <<= 1;  i--;
+			}
+			*p = ch;
+		}
+		start[len] = nextcode;
+	}
+}
+/***********************************************************
+	maketree.c -- make Huffman tree
+***********************************************************/
+#include "ar.h"
+
+static int    n, heapsize;
+static short  heap[NC + 1];
+static ushort *freq, *sortptr, len_cnt[17];
+static uchar  *len;
+
+static void count_len(int i)  /* call with i = root */
+{
+	static int depth = 0;
+
+	if (i < n) len_cnt[(depth < 16) ? depth : 16]++;
+	else {
+		depth++;
+		count_len(left [i]);
+		count_len(right[i]);
+		depth--;
+	}
+}
+
+static void make_len(int root)
+{
+	int i, k;
+	uint cum;
+
+	for (i = 0; i <= 16; i++) len_cnt[i] = 0;
+	count_len(root);
+	cum = 0;
+	for (i = 16; i > 0; i--)
+		cum += len_cnt[i] << (16 - i);
+	while (cum != (1U << 16)) {
+		fprintf(stderr, "17");
+		len_cnt[16]--;
+		for (i = 15; i > 0; i--) {
+			if (len_cnt[i] != 0) {
+				len_cnt[i]--;  len_cnt[i+1] += 2;  break;
+			}
+		}
+		cum--;
+	}
+	for (i = 16; i > 0; i--) {
+		k = len_cnt[i];
+		while (--k >= 0) len[*sortptr++] = i;
+	}
+}
+
+static void downheap(int i)
+	/* priority queue; send i-th entry down heap */
+{
+	int j, k;
+
+	k = heap[i];
+	while ((j = 2 * i) <= heapsize) {
+		if (j < heapsize && freq[heap[j]] > freq[heap[j + 1]])
+		 	j++;
+		if (freq[k] <= freq[heap[j]]) break;
+		heap[i] = heap[j];  i = j;
+	}
+	heap[i] = k;
+}
+
+static void make_code(int n, uchar len[], ushort code[])
+{
+	int    i;
+	ushort start[18];
+
+	start[1] = 0;
+	for (i = 1; i <= 16; i++)
+		start[i + 1] = (start[i] + len_cnt[i]) << 1;
+	for (i = 0; i < n; i++) code[i] = start[len[i]]++;
+}
+
+int make_tree(int nparm, ushort freqparm[],
+				uchar lenparm[], ushort codeparm[])
+	/* make tree, calculate len[], return root */
+{
+	int i, j, k, avail;
+
+	n = nparm;  freq = freqparm;  len = lenparm;
+	avail = n;  heapsize = 0;  heap[1] = 0;
+	for (i = 0; i < n; i++) {
+		len[i] = 0;
+		if (freq[i]) heap[++heapsize] = i;
+	}
+	if (heapsize < 2) {
+		codeparm[heap[1]] = 0;  return heap[1];
+	}
+	for (i = heapsize / 2; i >= 1; i--)
+		downheap(i);  /* make priority queue */
+	sortptr = codeparm;
+	do {  /* while queue has at least two entries */
+		i = heap[1];  /* take out least-freq entry */
+		if (i < n) *sortptr++ = i;
+		heap[1] = heap[heapsize--];
+		downheap(1);
+		j = heap[1];  /* next least-freq entry */
+		if (j < n) *sortptr++ = j;
+		k = avail++;  /* generate new node */
+		freq[k] = freq[i] + freq[j];
+		heap[1] = k;  downheap(1);  /* put into queue */
+		left[k] = i;  right[k] = j;
+	} while (heapsize > 1);
+	sortptr = codeparm;
+	make_len(k);
+	make_code(nparm, lenparm, codeparm);
+	return k;  /* return root */
+}
+Files included on the disks that accompany "The Data Compression Book".
+
+Note:   All of the "EXE" files are self extracting archives created with
+        LHarc 2.10.  LHarc can be extracted by executing LHA211.EXE.  In
+        the event that self extracting archives make you nervous, you can
+        extract all the files using your personal copy of LHarc with a
+        command like this:  "LHA x a:archive.exe".
+
+READ.ME         This file.
+
+MAIN-C.C        The C file used as a driver for all of the example
+                compression programs in the book.
+
+MAIN-E.C        The C file used as a driver for all the example expansion
+                programs in the book.
+
+MAIN.H          The header file which give prototypes and definitions for
+                the routines and data structures which MAIN-C.C and
+                MAIN-E.C expect to find in compression routines.
+
+BITIO.C         The C file containing the bit oriented I/O routines used
+                by many of the programs in this book.
+
+BITIO.H         The header file with prototypes used by the bit oriented
+                I/O routines.
+
+ERRHAND.C       The fatal error handler used by the compression routines
+                in the book.
+
+ERRHAND.H       The function prototype for the error handler.
+
+HUFF.C          The simple Huffman coder module from Chapter 3.
+
+AHUFF.C         Adaptive Huffman coder module from Chapter 4.
+
+ARITH.C         Arithmetic coding from Chapter 5.
+
+ARITH1.C        A simple order-1 arithmetic coding example from Chapter 6.
+
+ARITH1E.C       Order-1 arithmetic with escape codes added.
+
+ARITH-N.C       Order-n arithmetic coding from Chapter 6.
+
+LZSS.C          An LZSS compression module from Chapter 8.
+
+LZW12.C         A simple 12 bit LZW compression module from Chapter 9.
+
+LZW15V.C        A fully featured LZW compression module.  This version
+                includes variable length codes up to 15 bits, and tree
+                flushing.
+
+SILENCE.C       Silence compression of audio samples from Chapter 10.
+
+COMPAND.C       Companding compression of audio samples from Chapter 10.
+
+DCT.C           DCT based compression of graphics files from Chapter 11.
+
+GS.C            MS-DOS Grey scale file viewer from Chapter 11.
+
+GSDIFF.C        MS-DOS Grey scale difference viewer from Chapter 11.
+
+CARMAN.C        Compression/archive manager from Chapter 12.
+
+CHURN.C         The CHURN program listed in Appendix B.
+
+GS_FILES.EXE    A self extracting archive containing the grey scale example
+                files used in Chapter 11.
+
+RAW_FILE.EXE    A self extracting archive containing the sound files used
+                in Chapter 10.
+
+LHA211.EXE      The exeutables and documentation for LHarc version 2.11.
+                This is the version of LHarc used to create all of the
+                self extracting archives on these diskettes.
+
+AR002.EXE       A self extracting archive containing the source code for
+                an archiving program written by Haruhiko Okumura.
+

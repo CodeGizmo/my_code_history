@@ -1,0 +1,3 @@
+as between G1 and G2.
+Separate substrate connections B1 and B2 are provided.  Observe that B1 is tied to S1 and is connected to the lowest voltage (0 V in Fig. 5-16b), whereas B2 is connected to S2 and is maintained at the most positive voltage VDD.  Since B1 is the p-type well and B2 is the n-type well the pn diode formed by these regions is reverse-biased.  Thus isolation between the NMOS and PMOS transistors is automatically achieved.
+It is important to observe that the PMOS transistor occupies more ch

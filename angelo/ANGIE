@@ -1,0 +1,1151 @@
+
+ Volume in drive D is GDI            Serial number is 20FA:6D68
+ Directory of  d:\angelo\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+1-19-94      <DIR>      6-24-96 11:25a 
+C_PROGS      <DIR>      6-08-96  2:51p 
+DISASM       <DIR>      6-08-96  2:51p 
+MACHINE      <DIR>      6-08-96  2:51p 
+NEWEST       <DIR>      6-08-96  2:49p 
+OLD&BACK     <DIR>      6-08-96  2:50p 
+PERIPHER     <DIR>      6-08-96  2:50p 
+PS_FILES     <DIR>      6-08-96  2:50p 
+U            <DIR>      6-08-96  2:51p 
+UMPISANA     <DIR>      6-08-96  2:50p 
+WAV          <DIR>      6-08-96  2:51p 
+ZIPUTIL      <DIR>      6-08-96  2:51p 
+angie            2840   8-28-96  8:27a 
+testmode pas      321   5-19-96  9:58a 
+turbo    dsk      568   5-19-96 10:03a 
+       3,729 bytes in 17 file(s)             8,192 bytes allocated
+
+ Directory of  d:\angelo\newest\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+ACE          <DIR>      6-08-96  2:50p 
+EXPANDED     <DIR>      6-08-96  2:50p 
+HOBBY        <DIR>      6-08-96  2:50p 
+ICON         <DIR>      6-08-96  2:50p 
+MYCHESS      <DIR>      6-08-96  2:50p 
+NEWER        <DIR>      6-08-96  2:50p 
+PICTURES     <DIR>      6-08-96  2:49p 
+RAC          <DIR>      6-08-96  2:49p 
+SEPARATE     <DIR>      6-08-96  2:49p 
+ZIPUTILS     <DIR>      6-08-96  2:49p 
+angel    ps       248   5-29-94  4:24p 
+angelo   pas      248   5-29-94  4:24p 
+angelo   ps      2642   5-29-94  6:57p 
+angelo2  pas     3752   5-31-94 11:38p 
+angelo3  exe     9104   8-18-96  3:20a 
+angelo3  pas     4056   7-12-94  8:22p 
+asciitab tpu     4016  12-04-95  5:49p 
+assoc    tpu    15024  12-04-95  5:48p 
+bounds   tpu    10144  12-04-95  5:45p 
+bricks   tpu     4592  12-04-95  5:45p 
+calc     tpu     7856  12-04-95  5:49p 
+calendar tpu     4368  12-04-95  5:49p 
+charmani tpu     5200   6-11-94  1:36p 
+chgtime  pas       81   6-08-95 10:17p 
+chklist  ms       108  12-30-93 11:30a 
+colors   tpu     3856  12-04-95  5:48p 
+count    tpu     7632  12-04-95  5:45p 
+democmds tpu      528  12-04-95  5:49p 
+demohelp tpu     1248  12-04-95  5:49p 
+demostrs tpu      832  12-04-95  5:49p 
+dirview  tpu    10336  12-04-95  5:48p 
+dragdrop tpu     3616  12-04-95  5:48p 
+editchar pas       53   4-04-94  7:01p 
+editletr pas     2361   2-20-94  3:21p 
+equ      tpu     3328  12-04-95  5:48p 
+filecopy tpu    10656  12-04-95  5:48p 
+filefind tpu     8592  12-04-95  5:48p 
+fileview tpu    11344  12-04-95  5:48p 
+gadgets  tpu     2736  12-04-95  5:48p 
+gauges   tpu     4368  12-04-95  5:48p 
+globals  tpu    16800  12-04-95  5:48p 
+go       pas     1017   6-22-94  8:36p 
+graphstr pas     6001   3-31-94  4:08p 
+helpfile tpu    24768  12-04-95  5:49p 
+huffman4 pas     9785   3-30-94  6:04p 
+huffman6 pas     2571   4-02-94  7:22p 
+huffmn22 pas     6479   2-18-94  4:47p 
+infoview tpu     3680  12-04-95  5:48p 
+keep     pas      615   3-06-96 10:01p 
+keep2    map      384   6-07-95 12:27p 
+keep2    pas      991   6-08-95  5:13p 
+keep3    pas     2811   6-07-95 10:39p 
+keepp    pas      617   3-06-96 10:05p 
+keyboard pas     4811   1-13-94  9:19p 
+keyboard tpu     4336   2-07-96  9:44a 
+keytest  pas      394   1-11-94  8:44p 
+letters  all    65000   1-07-94 11:00p 
+lizadraw exe    20816   8-18-96  3:20a 
+lizadraw pas     7421   4-11-94  3:17p 
+lizadraw pif      967   8-18-96  3:46a 
+liztolcr pas     2994   4-11-94 11:22a 
+liztonor pas      558   4-04-94 11:23a 
+loadtiff pas     2355   3-24-94 10:33p 
+logo     liz     9964   3-31-94  5:12p 
+logs     all   128769   1-14-94  7:20p 
+maximum  pas      981   4-04-94 12:46p 
+maximum2 pas     3833   4-04-94  3:57p 
+mouse    pas     2183   1-11-94 10:33p 
+mouse    tpu     2560   1-11-94 10:33p 
+mouse2   pas     2301   4-04-94  7:00p 
+mouse2   tpu     2656   4-04-94  7:00p 
+mousedlg tpu     3536  12-04-95  5:49p 
+msmouse  com    16318   1-25-90  3:30p 
+mychar   chr     7682   1-13-94 11:17p 
+mygame   pas     1486   4-11-94 12:20p 
+mystring pas     1608   4-04-94  9:25p 
+mystring tpu     1840   8-18-96  3:21a 
+new               987   4-27-96  9:10a 
+newdraw7 exe    36208   8-18-96  3:16a 
+newdraw7 pas    27598   6-09-94  8:42p 
+newdraw7 pif      967   8-18-96  3:44a 
+newdraw8 pas    27590   2-07-96 10:29a 
+newest   pas    18912   4-04-94  9:17p 
+newest2  pas    18908   4-04-94  9:25p 
+newest3  exe    28384   8-18-96  3:21a 
+newest3  pas    18890   2-07-96  9:56a 
+newint08 pas     2447   6-03-95  9:06p 
+newint09 pas     3075   6-07-93  7:20p 
+newint09 tpu     3264   4-11-94 11:01a 
+nonam    pas      822   4-23-94  5:56p 
+nonam2   pas     2493   4-05-94 10:12p 
+noname   pas      495   4-22-94 12:21p 
+old              1003   4-27-96  9:10a 
+outcome         12110   9-10-95  9:15p 
+printer  pas     1641   6-26-91  3:34p 
+puzzle   tpu     5312  12-04-95  5:49p 
+rolfazil doc      550   5-02-94  8:06a 
+rolfazil pas    23159   6-12-94  1:15p 
+rolfazil tpu    24672  10-23-94 11:58a 
+screen   tpu     5584  12-04-95  5:45p 
+slide    pas     1710   4-08-94 10:54p 
+slide3   pas      901   4-08-94  9:09p 
+slidew   pas     3787   4-04-94  6:37p 
+slidew   tpu     3744   4-08-94  9:08p 
+sndload  pas     2353   5-11-94  9:49p 
+strmanip pas     1656   1-07-94 11:14p 
+tifftest pas      736   7-12-94  7:40p 
+toarj           65000   5-30-94 11:42a 
+tools    tpu    36528  12-04-95  5:48p 
+tp4gif   pas    14001   1-01-93 12:00a 
+tpx      dsk     1054  12-25-95  5:42p 
+tpx      psm    57901  12-25-95  5:40p 
+trash    tpu     3744  12-04-95  5:48p 
+treewin  tpu     6704  12-04-95  5:48p 
+turbo    drw     3874   5-30-94  9:45a 
+turbo    dsk     3452   8-18-96  3:26a 
+turbo    tp      4189   8-18-96  3:26a 
+turbo    tpp     4189   2-04-94  8:29p 
+tvrdemo  ovr    95039  12-04-95  5:49p 
+vgaliza3 pas    65384   6-04-96  4:44a 
+vgaliza3 tpu    50912   6-04-96  4:44a 
+viewhex  tpu     6560  12-04-95  5:48p 
+viewtext tpu     3984  12-04-95  5:48p 
+walls    tpu     5296  12-04-95  5:45p 
+windows  pas     1092   2-04-94  9:28p 
+zipper   pas     1029   5-30-94 11:41a 
+zipper2  pas      816   6-12-94  1:08p 
+   1,225,519 bytes in 129 file(s)        1,349,632 bytes allocated
+
+ Directory of  d:\angelo\newest\pictures\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+cons     lc5     2857   4-11-94 10:13a 
+cons     lc6        0   4-11-94 11:15a 
+cons     lcr     2893   4-11-94 10:09a 
+cons     liz     5044   1-07-94  9:32p 
+dummychr       128769   1-14-94 10:00p 
+foricons all    64000  10-07-95  1:06p 
+foricons lc5       45   4-11-94 10:13a 
+foricons lc6       45   4-11-94 11:15a 
+foricons lcr       45   4-11-94 10:09a 
+foricons liz     7394   1-31-93  4:05a 
+gifloadr pas      487   4-08-94  8:55p 
+globe    all   128769   1-16-94  2:28p 
+harrisch       128769   4-07-93  4:27p 
+icons    lc5      364   4-11-94 10:13a 
+icons    lc6      360   4-11-94 11:15a 
+icons    lcr      365   4-11-94 10:09a 
+icons    liz     2851   1-31-93  4:00a 
+icontm          19598   3-24-94  9:48p 
+letters  all    65000   1-07-94 11:00p 
+letters  lc5     1233   4-11-94 10:13a 
+letters  lc6     1214   4-11-94 10:16a 
+letters  lcr     1250   4-11-94 10:09a 
+letters  liz     3762   1-13-94 10:53p 
+lizhel   all    65000   3-24-94  9:55p 
+lizhel   lc5     9093   4-11-94 10:13a 
+lizhel   lc6     9058   4-11-94 10:17a 
+lizhel   lcr     9741   4-11-94 10:09a 
+lizhel   liz    12231   3-24-94  2:39p 
+lizhel3  lc5     2771   4-11-94 10:13a 
+lizhel3  lc6     2725   4-11-94 10:17a 
+lizhel3  lcr     2789   4-11-94 10:09a 
+lizhel3  liz     4000   3-24-94  7:41p 
+lizload  pas      228  11-02-94 11:26p 
+logo     lc5     5519   4-11-94 10:14a 
+logo     lc6     5488   4-11-94 10:17a 
+logo     lcr     6101   4-11-94 10:10a 
+logo     liz     9964   3-31-94  5:12p 
+logo2    all    65000   4-05-94  8:55p 
+logs     all   128769   1-14-94  7:20p 
+mit_crly cdr   317498   6-18-94  6:17a 
+mit_logo cdr   197016   1-04-80 11:00a 
+mychar   chr     7682   1-13-94 11:17p 
+myicons  lc5     3040   4-11-94 10:14a 
+myicons  lc6     2956   4-11-94 10:18a 
+myicons  lcr     3050   4-11-94 10:10a 
+myicons  liz     9955  11-29-93  3:20p 
+myicons2 lc5     4165   4-11-94 10:14a 
+myicons2 lc6     4041   4-11-94 10:18a 
+myicons2 lcr     4550   4-11-94 10:10a 
+myicons2 liz    14228   3-31-94  5:06p 
+newbunny all    64000  11-02-94  6:59p 
+newbunny lc5    11498   4-11-94 10:14a 
+newbunny lc6    10814   4-11-94 10:19a 
+newbunny lcr    12686   4-11-94 10:10a 
+newbunny liz    19587   1-31-93  5:15a 
+ship     lc5     3270   4-11-94 10:14a 
+ship     lc6     3131   4-11-94 10:19a 
+ship     lcr     3578   4-11-94 10:10a 
+ship     liz    31108  12-29-93 11:59p 
+telephon         4664  10-08-95  8:56p 
+tifftest tif     5282   7-12-94  7:39p 
+tifloadr pas      487   4-08-94  8:55p 
+turbo    dsk     1788   3-06-96  7:47p 
+walk     lc5     2330   4-11-94 10:15a 
+walk     lc6     2243   4-11-94 10:19a 
+walk     lcr     2743   4-11-94 10:11a 
+walk     liz    13267   2-02-93  6:56a 
+walk1    lc5      257   4-11-94 10:15a 
+walk1    lc6      256   4-11-94 10:19a 
+walk1    lcr      257   4-11-94 10:11a 
+walk1    liz     7731   1-31-93  5:47a 
+wall     all    64000  11-02-94 11:26p 
+wall     lc5       69   4-11-94 10:15a 
+wall     lc6       71   4-11-94 10:19a 
+wall     lcr       69   4-11-94 10:11a 
+wall     liz    34715  12-29-93 11:18p 
+   1,771,673 bytes in 78 file(s)         1,853,440 bytes allocated
+
+    Total for:  d:\angelo\newest\pictures\*.*
+   1,771,673 bytes in 78 file(s)         1,853,440 bytes allocated
+
+ Directory of  d:\angelo\newest\rac\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+boot     pas      436   5-09-94  9:32p 
+bootsec  com      512   5-09-94  9:32p 
+messages pas      260   5-09-94  5:23p 
+turbo    dsk      582   5-09-94  9:32p 
+       1,790 bytes in 6 file(s)              8,192 bytes allocated
+
+    Total for:  d:\angelo\newest\rac\*.*
+       1,790 bytes in 6 file(s)              8,192 bytes allocated
+
+ Directory of  d:\angelo\newest\separate\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+320x400  pas     4982   3-12-93  9:15a 
+a        asm      236   1-19-94  5:09p 
+bmp      pas     1016   1-18-94 10:01p 
+bmp2     pas     1102   1-18-94 10:09p 
+dectobin pas      409   3-01-94  7:10p 
+dectohex pas      572   3-01-94  7:18p 
+effects  pas     2322  12-30-93  2:26p 
+fill     pas     4598  12-03-93  9:56p 
+forcompr ess    27544   1-14-94  9:01p 
+formatok bak    30238  10-18-95 10:56a 
+formatok pas    30236   8-18-96  1:43p 
+fractal  pas     1141   5-09-94  4:47p 
+huff41   pas     9439   3-30-94  4:27p 
+huffman  pas     3099   1-27-94  1:19p 
+huffman0 pas     3783   2-11-94  3:52p 
+huffman2 pas     8137   3-19-94  4:38p 
+huffman3 pas     7726   3-24-94 11:41a 
+huffman5 pas     8248   3-30-94  2:33p 
+icon     pas      726   3-14-94  9:44p 
+m        bat        7   2-24-94  7:16p 
+machin55 pas     4642   3-11-94 10:37p 
+machine1 pas     1533   2-20-94  2:39p 
+machine2 pas     1430   2-24-94  9:15p 
+machine3 pas     4154   2-25-94  9:43a 
+machine4 pas     3887   2-25-94 10:48a 
+machine5 pas     2308   5-09-94  4:05p 
+modetest pas      424   1-01-93  1:12a 
+mychar   chr     7682   1-13-94 11:17p 
+myhuff   pas      935   3-14-94  9:36p 
+newdraw  pas    26120   1-12-94  9:37p 
+newdraw6 pas    25745   1-10-94 10:35p 
+newdraw7 pas    27540   2-27-94 10:05p 
+newtools pas     4276  12-09-93  4:48p 
+prnfltr  pas     9625  10-05-92  7:00a 
+roselle  pas     2101   5-09-94  4:59p 
+scan     pas      110   1-28-94 12:05p 
+scantest pas      254   1-25-94  8:27p 
+turbo    dsk     1748   8-18-96  1:50p 
+turbo    tp      4189   8-18-96  1:50p 
+vgaliza2 pas    56871   1-16-94  1:42p 
+vgaliza2 tpu    42480   1-28-94 10:33a 
+vgaliza3 pas    57172   1-30-94  6:50a 
+vincents pas      722   3-26-94  8:27p 
+     431,509 bytes in 45 file(s)           479,232 bytes allocated
+
+    Total for:  d:\angelo\newest\separate\*.*
+     431,509 bytes in 45 file(s)           479,232 bytes allocated
+
+ Directory of  d:\angelo\newest\ziputils\*.*
+
+.            <DIR>      6-08-96  2:49p 
+..           <DIR>      6-08-96  2:49p 
+adap     pas     5883  12-31-94 10:46p 
+adap2    pas     5882   1-01-95 12:36p 
+adap3    pas     5693   1-01-95  2:34p 
+adap4    pas     5881   1-01-95  5:43p 
+adap5    pas    10066   1-12-95 10:39p 
+adap6    pas    11423   1-12-95 11:59p 
+adap7    pas    16662   1-14-95 12:18p 
+adap8    map    14220   1-15-95  8:06p 
+adap8    pas    12961   4-18-95 11:31p 
+adap9    map    15771   1-14-95 10:18p 
+adap9    pas    23389   1-14-95 10:17p 
+adap26   pas     9921   1-01-95  5:13p 
+adap44   pas     5413   1-01-95  6:06p 
+adaptive pas     5590  12-31-94  3:34p 
+addtoptr pas      290   1-02-95 12:09p 
+all             61548   1-16-95  4:31p 
+asm      pas     1744   1-14-95 10:18p 
+ellesor  pas    12963  10-05-95 10:39p 
+mychar   chr     7682   1-13-94 11:17p 
+rolfazil pas    23325   1-01-95  2:38p 
+rolfazil tpu    24752   1-01-95  2:38p 
+slidew   pas     4521   1-01-95  5:48p 
+slimmer  pas     1151   1-11-95 11:27p 
+tdconfig td       625   1-14-95  9:49p 
+tpx      dsk      718   4-18-95 11:36p 
+turbo    dsk     2826  10-08-95 12:44a 
+wala     pas     8518  12-31-94 11:36p 
+     299,418 bytes in 29 file(s)           325,632 bytes allocated
+
+    Total for:  d:\angelo\newest\ziputils\*.*
+     299,418 bytes in 29 file(s)           325,632 bytes allocated
+
+ Directory of  d:\angelo\newest\expanded\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+expanded pas     1624   1-09-95  8:47p 
+lmul2    pas     1301   1-09-95  8:53p 
+turbo    dsk     1615  10-27-95  4:29p 
+       4,540 bytes in 5 file(s)              6,144 bytes allocated
+
+    Total for:  d:\angelo\newest\expanded\*.*
+       4,540 bytes in 5 file(s)              6,144 bytes allocated
+
+ Directory of  d:\angelo\newest\ace\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+adap8    map    15251   1-14-95  9:25p 
+charmani pas     4397  10-27-94 10:57p 
+charmani tpu     6448  10-28-94  5:20p 
+chartest pas      270  10-28-94  5:30p 
+chmani2  pas     4836  10-28-94  5:28p 
+chmani2  tpu     6448  10-28-94  5:28p 
+foricons rt2    60173  11-02-94 11:21p 
+f_hdlr   tpu    10752  11-15-94  8:49p 
+graphstr pas     6012  10-28-94  5:41p 
+io       tpu    20848  11-15-94  8:49p 
+keyboard tpu     4272   8-06-94  5:47p 
+mice     tpu     3328   9-28-94  4:24p 
+mouse    tpu     3408  11-15-94  8:49p 
+mouse2   pas     2301   4-04-94  7:00p 
+mouse2   tpu     2656   4-04-94  7:00p 
+msgs     tpu    12976  11-15-94  8:49p 
+mychar0  chr     2050   6-06-94 10:45p 
+mychar1  chr     2050   6-06-94 10:43p 
+mychar2  chr      962   6-11-94 10:53a 
+mycrt    tpu     3376   9-28-94  4:29p 
+mystring pas     1608   4-04-94  9:25p 
+newbunny rt1    23675  11-02-94 10:57p 
+newint09 tpu     2752   8-06-94  5:48p 
+prnjpcs  tpu    25296  11-15-94  8:49p 
+result   all        0  12-19-94 10:16a 
+rolfazil doc      886   4-18-95 11:28p 
+rolfazil pas    23316   5-31-94  3:17p 
+rolfazil tpu    31552  11-02-94  7:23p 
+rolftes2 pas     1888  11-02-94 11:56p 
+rolftes3 pas     1894  11-03-94 12:27a 
+rolftest pas     1621  11-02-94 11:12p 
+rolftest txt       24  11-02-94 11:57p 
+run      all        1  12-19-94 10:21a 
+runs     all        2   8-25-96  6:32a 
+search   tpu    11520  11-15-94  8:49p 
+slimmer  pas      930  11-02-94  5:40p 
+test1    all      417  12-19-94 10:23a 
+test2    all      417  12-19-94 10:26a 
+test3    all      417  12-04-95  5:21p 
+test4    all      417  12-04-95  5:33p 
+test5    all      417  12-27-95  4:17p 
+test6    all      417  12-27-95  4:21p 
+test7    all      417  12-27-95  6:04p 
+test8    all      417  12-27-95  6:08p 
+test9    all      417  12-27-95  6:14p 
+test10   all      417  12-27-95  6:17p 
+test11   all       71  12-27-95  6:20p 
+test12   all       71  12-27-95  6:21p 
+test13   all       71  12-27-95  6:21p 
+test14   all       72  12-27-95  6:23p 
+test15   all       72  12-27-95  6:24p 
+test16   all       71  12-27-95  6:24p 
+test17   all       72  12-27-95  6:25p 
+test18   all       72  12-27-95  6:26p 
+test19   all       71  12-27-95  6:27p 
+test20   all       71  12-27-95  6:28p 
+test21   all       71  12-27-95  6:28p 
+test22   all       71  12-27-95  6:29p 
+test23   all       71  12-27-95  6:30p 
+test24   all       71  12-27-95  6:30p 
+test25   all       71  12-27-95  6:31p 
+test26   all       71  12-27-95  6:32p 
+test27   all       71  12-27-95  6:32p 
+test28   all       71  12-27-95  6:33p 
+test29   all       71  12-27-95  6:33p 
+test30   all       71  12-27-95  6:34p 
+test31   all       71  12-27-95  6:34p 
+test32   all       71  12-27-95  6:37p 
+test33   all       71  12-27-95  6:37p 
+test34   all       71  12-27-95  6:40p 
+test35   all       71  12-27-95  7:12p 
+test36   all       71  12-27-95  7:13p 
+test37   all       71  12-27-95  7:14p 
+test38   all       71  12-27-95  7:14p 
+test39   all       71  12-27-95  7:15p 
+test40   all       71  12-27-95  7:16p 
+test41   all       71  12-27-95  7:16p 
+test42   all       71  12-27-95  7:17p 
+test43   all       71  12-27-95  7:17p 
+test44   all       71  12-27-95  7:18p 
+test45   all      417  12-27-95  7:20p 
+test46   all      417  12-31-95 12:52p 
+test47   all        0  12-31-95 12:52p 
+test48   all        0  12-31-95 12:53p 
+test49   all        0  12-31-95 12:53p 
+test50   all        0  12-31-95 12:54p 
+test51   all        0  12-31-95 12:54p 
+test52   all        0  12-31-95 12:54p 
+test53   all        0  12-31-95 12:55p 
+test54   all      417   1-14-96  9:08p 
+test55   all      701   1-14-96  9:15p 
+test56   all      346   1-14-96  9:27p 
+test57   all      346   1-14-96  9:30p 
+test58   all      346   1-14-96  9:31p 
+test59   all      346   1-14-96  9:34p 
+test60   all      700   1-14-96  9:38p 
+test61   all      700   1-14-96  9:43p 
+test62   all      700   1-14-96  9:57p 
+test63   all      417   8-25-96  6:32a 
+testped2 exe    13728   8-24-96 10:17a 
+testped2 pas     6990   1-14-96 10:10p 
+testpeed bak     3968   8-25-96  6:29a 
+testpeed exe    11648   8-25-96  6:32a 
+testpeed pas     3978   8-25-96  6:31a 
+testsnd  pas       60  12-31-95  1:00p 
+threedim tpu     8752   9-28-94  4:30p 
+tp0a7c6a $$$    20480   8-24-96 10:30a 
+tp0a4615 $$$        0   8-24-96 10:16a 
+tpx      dsk      675  12-27-95  6:17p 
+tpx      psm    15016  12-04-95  5:32p 
+tulong   tpu     4480  11-15-94  8:49p 
+turbo    dsk     2358   8-25-96  6:33a 
+vgaliza3 pas    65988  11-02-94  6:54p 
+vgaliza3 tpu    51456  12-31-94  9:17p 
+wall     rt2   176571  11-02-94 11:41p 
+win6     tpu    15184   9-28-94  4:24p 
+windows  tpu    15840  11-15-94  8:49p 
+     729,392 bytes in 119 file(s)          894,976 bytes allocated
+
+    Total for:  d:\angelo\newest\ace\*.*
+     729,392 bytes in 119 file(s)          894,976 bytes allocated
+
+ Directory of  d:\angelo\newest\hobby\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+intersrv pas      254  11-11-94 11:10a 
+lmul2    pas     1830   1-09-95  9:18p 
+lmulkama pas     1254  10-15-94  9:58p 
+long_mul pas     1200  10-15-94  9:51p 
+magicbox pas     3351   1-21-96  9:40p 
+to_base  pas      629  10-15-94 10:23p 
+tpx      dsk     1267  12-04-95  5:19p 
+tpx      psm     9311  12-04-95  5:19p 
+turbo    dsk     1608   1-21-96 11:40p 
+      20,704 bytes in 11 file(s)            28,672 bytes allocated
+
+    Total for:  d:\angelo\newest\hobby\*.*
+      20,704 bytes in 11 file(s)            28,672 bytes allocated
+
+ Directory of  d:\angelo\newest\icon\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+DUMMY        <DIR>      6-08-96  2:50p 
+3d       pas     1239   9-15-94 10:44p 
+3d2      pas     1973   9-17-94  4:35p 
+angelo3  pas     4107   5-31-94 11:26p 
+angelo4  pas     4120   7-12-94  8:08p 
+angelo9  pas     4409  10-22-95 10:05p 
+charmani pas     4397  10-27-94 10:57p 
+charmani tpu     4880  10-28-94  5:05p 
+chartes2 pas      380   6-12-94 12:40p 
+chartest pas      353   6-06-94 11:03p 
+chips    pas      258   9-15-94  8:40p 
+chmani2  tpu     5088  11-13-94  2:06p 
+compress pas     3672   8-14-94 12:33p 
+compress tpu     3584   8-14-94 12:33p 
+fadetest pas     1167  10-08-94  9:56a 
+formfeed pas     3657   8-14-94 12:13p 
+formfeed tpu     3600   8-14-94 12:13p 
+formfid2 pas     1159   8-30-94 11:04p 
+f_hdlr   tpu     8832  11-15-94  8:50p 
+getfonts ps       524   7-05-94  7:43p 
+icee     pas     5010   7-07-94 12:45a 
+icee2    pas     4988   7-07-94  1:04a 
+icee3    pas     5021   7-07-94  1:17a 
+icon     pas     2669   5-31-94  7:30p 
+icon2    pas     1594   6-06-94  6:33p 
+io       tpu    16384  11-15-94  8:50p 
+keyboard tpu     4272   8-06-94  5:47p 
+kuhaako  pas      563   5-31-94  7:44p 
+lastclus pas      314   6-23-94  5:05p 
+mice     tpu     3328   9-28-94  4:24p 
+mouse    pas     2183   1-11-94 10:33p 
+mouse    tpu     2816  11-15-94  8:50p 
+mouse2   pas     2301   4-04-94  7:00p 
+mouse2   tpu     2656   4-04-94  7:00p 
+msgs     tpu    10496  11-15-94  8:50p 
+myat     pas        0   6-29-94  4:11p 
+mychar0  chr     2050   6-06-94 10:45p 
+mychar1  chr     2050   6-06-94 10:43p 
+mychar2  chr      962   6-11-94 10:53a 
+mycrt    tpu     3376   9-28-94  4:29p 
+mytimer  tpu     1392   8-06-94  5:54p 
+newint09 tpu     2752   8-06-94  5:48p 
+prnjpcs  tpu    21088  11-15-94  8:50p 
+rolfazil doc      550   5-02-94  8:06a 
+rolfazil pas    23316   5-31-94  3:17p 
+rolfazil tpu    24768   5-31-94  4:26p 
+search   tpu     9376  11-15-94  8:50p 
+simpsons pas     7994   8-10-94  7:27p 
+simpsons tpu     9456   8-10-94  7:27p 
+tester   pas     2439   6-16-94  9:55p 
+tester2  pas     2488  12-25-94 10:17p 
+testps   pas     1066   7-05-94  7:54p 
+threedim tpu     8752   9-28-94  4:30p 
+topons   pas    14190  11-05-94  8:44a 
+tpx      dsk      668  12-21-94  8:56p 
+tulong   tpu     3712  11-15-94  8:50p 
+turbo    dsk     2071  10-22-95 10:08p 
+vga      tpu    15696   9-21-94  6:22a 
+vgaliz   tpu    31664   8-06-94  5:26p 
+vgaliza  tpu    37056   8-06-94  4:28p 
+vgaliza2 tpu    42512  10-24-94  6:57p 
+vgaliza3 pas    65971   5-23-95 10:37a 
+vgaliza3 tpu    51744   5-23-95 10:37a 
+vgayey   tpu    23584   8-06-94  4:40p 
+win6     tpu    15184   9-28-94  4:24p 
+windows  tpu    12384  11-15-94  8:50p 
+yeyey    pas     1432  10-16-94  7:31p 
+yeyey2   pas     1628  10-17-94  1:05p 
+     565,365 bytes in 70 file(s)           645,120 bytes allocated
+
+ Directory of  d:\angelo\newest\icon\dummy\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+charmani pas     6637  10-17-94  1:06p 
+charmani tpu     5200  10-17-94  1:06p 
+      11,837 bytes in 4 file(s)             14,336 bytes allocated
+
+    Total for:  d:\angelo\newest\icon\dummy\*.*
+      11,837 bytes in 4 file(s)             14,336 bytes allocated
+
+    Total for:  d:\angelo\newest\icon\*.*
+     577,202 bytes in 74 file(s)           659,456 bytes allocated
+
+ Directory of  d:\angelo\newest\mychess\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+mychess  pas      235   8-07-94 11:17a 
+turbo    dsk      979   8-07-94 11:17a 
+       1,214 bytes in 4 file(s)              4,096 bytes allocated
+
+    Total for:  d:\angelo\newest\mychess\*.*
+       1,214 bytes in 4 file(s)              4,096 bytes allocated
+
+ Directory of  d:\angelo\newest\newer\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+stat     pas      769   8-04-94  9:12p 
+stat2    pas      769   8-04-94  9:12p 
+turbo    dsk     1144   8-04-94  9:54p 
+       2,682 bytes in 5 file(s)              6,144 bytes allocated
+
+    Total for:  d:\angelo\newest\newer\*.*
+       2,682 bytes in 5 file(s)              6,144 bytes allocated
+
+    Total for:  d:\angelo\newest\*.*
+   5,065,643 bytes in 505 file(s)        5,615,616 bytes allocated
+
+ Directory of  d:\angelo\ps_files\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+angel    ps       248   5-29-94  4:24p 
+angelo   pas      248   5-29-94  4:24p 
+angelo   ps      2642   5-29-94  6:57p 
+angelo2  pas     2700   5-29-94  8:12p 
+turbo    dsk     1772  10-22-95  9:46p 
+       7,610 bytes in 7 file(s)             14,336 bytes allocated
+
+    Total for:  d:\angelo\ps_files\*.*
+       7,610 bytes in 7 file(s)             14,336 bytes allocated
+
+ Directory of  d:\angelo\umpisana\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+azil2    all     6315   6-19-94 11:32a 
+azil2    liz     5630   8-21-94 11:35a 
+azil2    pas    17265   6-19-94 11:25a 
+azil2    tpu    14384   6-19-94 11:26a 
+liz      liz      453   8-21-94 11:35a 
+liz      pas      624   6-17-94  6:47a 
+liztest  all     1586   6-19-94 11:32a 
+liztest  liz     1558   8-21-94 11:35a 
+liztest  pas     3286   6-19-94 11:35a 
+rolfazil liz     6772   8-21-94 11:36a 
+rolfazil pas    23159   6-12-94  1:15p 
+rolfazil tpu    19040   6-17-94  6:30a 
+turbo    dsk     1443   1-28-96  9:59p 
+     101,515 bytes in 15 file(s)           116,736 bytes allocated
+
+    Total for:  d:\angelo\umpisana\*.*
+     101,515 bytes in 15 file(s)           116,736 bytes allocated
+
+ Directory of  d:\angelo\peripher\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+dma_xfer pas      967  10-27-95  3:21p 
+time_spk pas      806  10-27-95  4:16p 
+turbo    dsk     1106   2-11-96  9:33a 
+       2,879 bytes in 5 file(s)              6,144 bytes allocated
+
+    Total for:  d:\angelo\peripher\*.*
+       2,879 bytes in 5 file(s)              6,144 bytes allocated
+
+ Directory of  d:\angelo\old&back\*.*
+
+.            <DIR>      6-08-96  2:50p 
+..           <DIR>      6-08-96  2:50p 
+19in     pas       44   1-08-93  1:31p 
+320x400  pas     4982   3-12-93  9:15a 
+aasm     pas     1395  12-30-92  7:40p 
+angelo   pas    30985   1-01-93  8:41a 
+angetool pas     5513  10-15-92  3:12p 
+angtool2 pas     5513   5-06-95 11:47p 
+asm      pas     1807   1-10-95  4:25p 
+asmcompi pas      395   5-23-93  9:21a 
+bugbunny liz    20040   2-27-93 11:17p 
+bunny           65000  11-23-93  2:11p 
+bunny    all    65535   5-30-91 11:05a 
+bunny    liz    19597  12-17-93  8:44p 
+chg_int9 asm      756   1-10-95  3:12p 
+chg_int9 com       67   1-10-95  3:12p 
+chg_int9 map       99   1-10-95  3:12p 
+chg_int9 pas      820   1-10-95  3:02p 
+condense pas     2746   7-06-93  4:04p 
+d        bat        9   6-01-93 11:18a 
+drallyey pas    15138   1-28-93  8:38a 
+dumb     liz     1466   6-07-93  4:47p 
+dummy           65000   1-31-93  5:17a 
+edit     pas    18076  12-23-92 11:36a 
+effects  pas     1613   8-06-94  4:38p 
+encrypt  pas     1573   7-20-93 10:26p 
+exhibit  pas      754   4-28-93  8:26p 
+file0000 chk      512           12:00a 
+fill     pas     4598  12-03-93  9:56p 
+foricons         7394   1-31-93  4:05a 
+foricons liz     7394   1-31-93  4:05a 
+frame    pas      358   2-18-93  9:41p 
+game     pas     5136  12-30-92  8:01p 
+graphall doc    17761   1-01-80 12:15a 
+graphyey doc    22870  11-17-91  3:03p 
+graphyey tpu    19120  11-11-92  1:15p 
+harris   liz      698  11-12-92  5:56p 
+hitech   pas      692   5-24-93  8:09p 
+hypnosis pas      789   6-24-93  8:00a 
+i9game   asm     2267   1-08-93  1:05p 
+i9game   com      196   5-11-96  2:17a 
+i9game   map       99   5-11-96  2:17a 
+i9game   obj      377   5-11-96  2:17a 
+iconload pas      366  11-28-93 11:18a 
+icons    liz     2851   1-31-93  4:00a 
+int9999  pas      325   4-25-93  5:45p 
+keyboard pas     4665   1-01-93  4:55a 
+keyboard tpu     5120   1-01-93  8:42a 
+letters  liz     2575  12-29-93  1:24a 
+lighsped pas      977   1-01-80 12:52a 
+lizdraw  pas    22978  11-29-93  5:13p 
+loadbuny pas      390  11-10-92  8:48p 
+logo             9157   1-05-93  7:39a 
+logo     liz     9812   2-02-93  6:26a 
+love     pas     1545   1-01-80 12:57a 
+maze     liz    19219   4-29-93  3:44p 
+minprint pas     1032   6-17-93  4:59p 
+mode80   pas       38   2-18-93  8:42p 
+modetest pas      758   1-23-94 10:12a 
+monthrev pas     1506  11-09-92  8:15p 
+mouse    asm      154   1-01-80 12:16a 
+mouse    com    14368  10-24-93  1:19p 
+mouse    pas      732   1-01-80 12:38a 
+mydemo   bat       75   4-28-93  8:31p 
+myicons  liz     9955  11-29-93  3:20p 
+myicons2 liz    12444  12-29-93  2:02a 
+mysound  pas      979  11-23-93  3:39p 
+mytimer  pas      379   6-03-92 11:21a 
+mytimer  tpu     1552  12-14-93  3:57p 
+new      bas    11913  12-05-92  5:44p 
+newbunny all    64000   5-17-93  2:22p 
+newbunny liz    19587   1-31-93  5:15a 
+newdraw2 pas    16916   7-22-93  6:08a 
+newdraw3 pas    20849  11-23-93 10:40p 
+newdraw4 pas    23102  11-29-93  3:28p 
+newdraw5 pas    23536   1-01-93  3:21a 
+newdrawi pas    12854   6-04-93  1:40p 
+newedit  pas    18657  12-26-92  6:17p 
+newforma pas     3883   4-28-93  6:49p 
+newint09 pas     3075   6-07-93  7:20p 
+newint09 tpu     2752  11-23-93  2:04p 
+newsnd2  pas      754  12-22-92 10:01p 
+newsnd02 pas      701   6-07-93  8:23p 
+newsound pas      796  12-22-92  9:59p 
+nonam1   pas      966   4-24-93 10:38p 
+obj2     pas     1238   1-05-93 11:00p 
+obj3     pas     1812   1-05-93 11:19p 
+objpoint pas      810   1-05-93 10:49p 
+opening  pas      332  12-30-92  9:58p 
+perspect pas     2422  11-09-92  5:17p 
+physics  liz     6399   4-29-93  3:14p 
+printer  pas     1641   6-26-91  3:34p 
+pyramid  pas     1180   1-28-93  6:45a 
+samefind pas     1579   6-07-93  5:06p 
+sample   liz     1120  12-29-93  1:31a 
+sample3  asm     2135   5-23-93  9:24a 
+search   pas      918   7-20-93  8:42p 
+sec1              512   5-06-95 11:53p 
+sec2              512   5-06-95 11:58p 
+sec3              512   5-06-95 11:58p 
+sec4              512   5-06-95 11:59p 
+sec5              512   5-06-95 11:59p 
+sec6              512   5-07-95 12:01a 
+sec7              512   5-07-95 12:01a 
+sec8              512   5-07-95 12:01a 
+sec9              512   5-07-95 12:01a 
+sec10             512   5-07-95 12:01a 
+sec11             512   5-07-95 12:02a 
+sec12             512   5-07-95 12:03a 
+sectors          6145   5-07-95 12:07a 
+slowput  pas     1825  10-14-92  6:42p 
+sndefec2 pas     1258  10-20-92 12:04p 
+sndefec3 pas     1019   6-07-93  5:23p 
+sndefecs pas     1356  10-13-92  3:13p 
+sorts    pas     1280   1-23-94  2:19p 
+sqroot   all    65535   5-31-93 10:45a 
+sqroot   pas     2902   6-01-93 10:25a 
+sqrt256  all      512   5-31-93  7:42p 
+stars    pas      774  12-17-92 10:22p 
+stars2   pas     3388  10-24-94  7:06p 
+stars3   pas     1363   8-10-94  7:04p 
+supervga pas     4752   4-29-93  2:44p 
+t        bat        9   5-19-93 11:05p 
+timetest pas      263  10-14-92  3:10p 
+tpx      dsk     1470   1-28-93  4:44a 
+tpx      psm    14217   1-23-94  2:19p 
+tpx      tp      4239   1-23-94  2:20p 
+turbo    dsk     2381   4-22-96  2:59p 
+turbo    tp      4189   4-22-96  2:59p 
+vgaliz   ex     36849   7-04-93  9:10a 
+vgaliz   ex1    36849   7-04-93  9:10a 
+vgaliz   pas    42650  12-03-93  8:05p 
+vgaliz   tpu    43392  12-03-93  8:06p 
+vgaliz   u      43184   1-05-93  5:35a 
+vgaliza  ex1     1696   1-01-93 12:38a 
+vgaliza  pas    48658   1-01-93  1:31a 
+vgaliza  tpu    37104   4-22-96  2:50p 
+vgayey   pas    30552   4-25-93  5:28p 
+vgayey   tpu    17856  12-29-93  8:40p 
+walk     liz    13267   2-02-93  6:56a 
+walk1    liz     7731   1-31-93  5:47a 
+window   pas     2053   4-22-96  2:59p 
+yeyvirus pas      744  12-05-92  9:18p 
+   1,276,669 bytes in 143 file(s)        1,443,840 bytes allocated
+
+    Total for:  d:\angelo\old&back\*.*
+   1,276,669 bytes in 143 file(s)        1,443,840 bytes allocated
+
+ Directory of  d:\angelo\disasm\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+angel    orc     1206   8-25-95  7:54p 
+angel    pas     8404   8-17-95  4:40a 
+banking  pas      311   7-07-95 10:24p 
+c000     com    32768   5-23-95  5:36p 
+chklist  ms       216   8-15-95 11:47p 
+cmg1     cmg      518   4-13-95  8:12p 
+cmg6     cmg      505   4-13-95  8:11p 
+cobfiles         3138   2-22-96 11:18a 
+dasmpart pas    14019   6-06-95  4:19p 
+disasm   pas    18453   3-26-95  7:25p 
+disasm2  pas    20576   5-23-95  5:52p 
+disasm3  pas    29452   6-06-95  3:28p 
+disasm4  pas    29346   6-05-95 11:51p 
+disasm5  bak    33086   2-04-96  7:35p 
+disasm5  exe    11872   8-18-96  3:28a 
+disasm5  pas    33080   8-18-96  3:28a 
+dlldebug txt       88   8-11-95  7:46p 
+doc3     mcw     3072   2-16-95 10:54a 
+eb               5036   6-28-95 11:19a 
+erlang   pas     2123   8-17-95 10:03a 
+ertbalg  pas      506   6-28-95 11:19a 
+exp      pas      182   4-15-95 11:25a 
+hello    asm     1695   1-05-96 10:25p 
+iterate  pas      242   8-16-95 12:29a 
+koc3     mcw     3072   2-16-95 10:54a 
+koeeinfo ncd     2763   6-29-95  5:36p 
+kog1     cmg      518   4-13-95  8:12p 
+kog6     cmg      505   4-13-95  8:11p 
+komdata  pas      300   1-08-95  1:43p 
+kosmpart pas    14019   6-06-95  4:19p 
+kot00    sv1   126292   5-14-95  8:19p 
+kox      psm    26400   4-15-95 11:25a 
+memdata  pas      300   1-08-95  1:43p 
+new      pas     1665   3-26-95 10:43p 
+refresh  pas      102  12-31-95  8:40p 
+refreshw pas      138  12-31-95  8:48p 
+serial   pas      652  12-27-95 11:41p 
+serial2  pas      792  12-28-95 11:41p 
+serial3  pas     1997   1-01-96  2:06p 
+shade    pas      872   5-22-95 11:04a 
+stacker  log      622  11-22-95  5:35a 
+subsched doc    14848   4-03-95 11:24p 
+table    pas     6594   3-26-95  4:18p 
+tdconfig td       679   6-05-95 10:54p 
+test     asm      217   3-26-95  7:37p 
+test     map      195   3-27-95  5:11p 
+test     obj      160   3-27-95  5:09p 
+testing  asm     1596   1-05-96 10:24p 
+testmode pas     1932  12-27-95  9:23p 
+tpx      dsk      676  12-29-95  1:43p 
+tpx      psm    26644  10-26-95 11:32a 
+tree             1656   2-01-95 10:35p 
+tree     asm    15057   4-22-96  2:31p 
+treeinfo ncd     2763   6-29-95  5:36p 
+trt00    sv1   126292   5-14-95  8:19p 
+turbo    dsk     1464   8-18-96  3:29a 
+turbo    tp      4189   8-18-96  3:29a 
+unasm    asm    13326   8-18-96  3:28a 
+unasm2   asm     7414   6-01-95 11:08p 
+with3    asm      128   6-05-95 11:43p 
+with3    com       10   6-05-95 11:44p 
+with3    map       99   6-05-95 11:44p 
+with3    obj      138   6-05-95 11:43p 
+with32   asm      128   6-05-95 11:45p 
+with32   map      170   6-05-95 11:45p 
+with32   obj      140   6-05-95 11:45p 
+     657,418 bytes in 68 file(s)           745,472 bytes allocated
+
+    Total for:  d:\angelo\disasm\*.*
+     657,418 bytes in 68 file(s)           745,472 bytes allocated
+
+ Directory of  d:\angelo\c_progs\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+bcwdef   csm   172626  10-22-95 10:18a 
+dowhile  cpp      436   1-24-96 10:33a 
+for      cpp      271   1-24-96 10:19a 
+if       c        423   1-15-96 12:13a 
+if       cpp      423  10-22-95 10:18a 
+if       obj     1150  10-22-95 10:18a 
+lenin    cpp      799   2-04-96  5:48p 
+lenin    doc     7680   2-04-96  5:53p 
+lenin    txt      979   2-04-96  5:53p 
+switch   c        420   1-15-96 12:11a 
+switch   cpp        0   1-14-96 11:54p 
+testing  asm     1548   1-05-96 10:28p 
+testing  c         58   1-05-96 10:22p 
+testing  map       88   1-05-96 10:28p 
+turbo    dsk     2276  10-07-95 10:22a 
+while    cpp      431   1-24-96 10:36a 
+while    obj     1548  10-22-95 10:12a 
+     191,156 bytes in 19 file(s)           212,992 bytes allocated
+
+    Total for:  d:\angelo\c_progs\*.*
+     191,156 bytes in 19 file(s)           212,992 bytes allocated
+
+ Directory of  d:\angelo\machine\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+datacom2 pas    25192  10-07-95 12:19p 
+datacom2 pif      967   3-06-96 11:39p 
+datacom3 pas    25750  10-07-95  1:59p 
+datacomp pas    21894   3-06-96 10:26p 
+lanuza   all    95969   8-18-96  3:37a 
+lanuza   exe    36304   8-18-96  3:34a 
+lanuza   pas    25750  10-07-95  1:59p 
+lanuza   pif      967  10-07-95  9:40p 
+nibble   pas    13732   1-14-96  6:17p 
+nibbles  exe    28816   8-18-96  3:32a 
+nibbles  pas    13786   1-28-96  8:56p 
+nibbles  pif      967   8-18-96  3:42a 
+part     pas     5920  10-08-95 11:37p 
+slides   pas     7500  10-06-95  9:01a 
+slides   tpu     7792  10-06-95  9:01a 
+turbo    dsk     1836   8-18-96  3:34a 
+     313,142 bytes in 18 file(s)           325,632 bytes allocated
+
+    Total for:  d:\angelo\machine\*.*
+     313,142 bytes in 18 file(s)           325,632 bytes allocated
+
+ Directory of  d:\angelo\ziputil\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+NEW          <DIR>      6-08-96  2:51p 
+adap     pas     5883  12-31-94 10:46p 
+adap2    pas     5882   1-01-95 12:36p 
+adap3    pas     5693   1-01-95  2:34p 
+adap4    pas     5881   1-01-95  5:43p 
+adap5    pas    10066   1-12-95 10:39p 
+adap6    pas    11423   1-12-95 11:59p 
+adap7    pas    16662   1-14-95 12:18p 
+adap8    map    14220   1-15-95  8:06p 
+adap8    pas    14471   1-28-96 10:06p 
+adap9    map    15771   1-14-95 10:18p 
+adap9    pas    23389   1-14-95 10:17p 
+adap26   pas     9921   1-01-95  5:13p 
+adap44   pas     5413   1-01-95  6:06p 
+adaptive pas     5590  12-31-94  3:34p 
+addtoptr pas      290   1-02-95 12:09p 
+all             61548   1-16-95  4:31p 
+asm      pas     1744   1-14-95 10:18p 
+chklist  ms        81   1-16-95  3:14p 
+ellesor  pas    12961   4-18-95 11:31p 
+rolfazil pas    23325   1-01-95  2:38p 
+rolfazil tpu    24752   1-01-95  2:38p 
+slidew   pas     4521   1-01-95  5:48p 
+slimmer  pas     1151   1-11-95 11:27p 
+tdconfig td       625   1-14-95  9:49p 
+tpx      dsk      853   1-28-96 10:15p 
+tpx      psm    64240   1-28-96 10:10p 
+turbo    dsk     1756   6-04-96  3:46a 
+wala     pas     8518  12-31-94 11:36p 
+     356,630 bytes in 31 file(s)           385,024 bytes allocated
+
+ Directory of  d:\angelo\ziputil\new\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+adap8    pas    16991   6-04-96 12:47p 
+all             61548   1-16-95  4:31p 
+huffman  pas     7836   6-04-96 10:56a 
+mychar   chr     7682   1-13-94 11:17p 
+tp041d5f $$$        0   6-04-96  4:06a 
+turbo    dsk     2076   6-04-96 12:56p 
+      96,133 bytes in 8 file(s)            102,400 bytes allocated
+
+    Total for:  d:\angelo\ziputil\new\*.*
+      96,133 bytes in 8 file(s)            102,400 bytes allocated
+
+    Total for:  d:\angelo\ziputil\*.*
+     452,763 bytes in 39 file(s)           487,424 bytes allocated
+
+ Directory of  d:\angelo\u\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+a        bat      299  12-02-94  1:22a 
+convert3 pas     1418  11-25-94 12:05p 
+down     pas      160  12-01-94 11:26p 
+enter    pas      159  12-01-94 11:27p 
+foreword pas     1026  11-29-94 11:18a 
+left     pas      160  12-01-94 11:26p 
+numlock  pas      158   5-08-96  4:11a 
+right    pas      160  12-01-94 11:26p 
+seemem   pas      311  12-01-94 11:14p 
+turbo    dsk     1761   5-08-96  4:12a 
+up       pas      160  12-01-94 11:25p 
+       5,772 bytes in 13 file(s)            22,528 bytes allocated
+
+    Total for:  d:\angelo\u\*.*
+       5,772 bytes in 13 file(s)            22,528 bytes allocated
+
+ Directory of  d:\angelo\wav\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+GAME         <DIR>      6-08-96  2:51p 
+a        bat       56  11-25-94 11:00a 
+bart     voc   370911   1-01-93  1:30a 
+convert  pas     1144  11-24-94  2:54p 
+convert2 pas     1280  11-24-94 10:08p 
+convert3 pas     1418  11-25-94 12:05p 
+effects  pas     2322  12-30-93  2:26p 
+ndiags   snd    56992   2-28-94  8:00a 
+newsnd02 pas      703  11-22-94 12:02p 
+newsnd2  pas      756  11-22-94 12:06p 
+newsound pas      796  12-22-92  9:59p 
+partime3 wav   262080  12-01-94 10:20p 
+play     pas     2419  11-25-94 10:39a 
+play2    pas     1055  11-23-94  9:20p 
+play3    pas     1249  11-24-94  2:54p 
+sample   voc   136662   1-01-93  1:30a 
+sndefec2 pas     1258  10-20-92 12:04p 
+sndefec3 pas     1019   6-07-93  5:23p 
+sndefecs pas     1356  10-13-92  3:13p 
+tpx      dsk      584  11-09-94 10:32a 
+turbo    dsk     1281  12-31-95  9:20p 
+turbo    tp      4189  12-31-95  9:20p 
+waveplay exe     7872  12-01-94 10:17p 
+waveplay pas     2704   6-07-95  2:57p 
+wavplay2 pas     2702  12-01-94 10:07p 
+wavplysv pas     2517  11-29-94 12:06p 
+wavs     arj   574481   8-11-95 12:01a 
+wavtest  pas     1426  11-28-94  9:44p 
+   1,441,232 bytes in 30 file(s)         1,470,464 bytes allocated
+
+ Directory of  d:\angelo\wav\game\*.*
+
+.            <DIR>      6-08-96  2:51p 
+..           <DIR>      6-08-96  2:51p 
+addition pas     3779  11-25-94  3:15p 
+addition tpu     6448  11-25-94  3:28p 
+breakrec wav    57388  11-25-94 11:58a 
+correct  wav     2184  11-25-94 11:42a 
+excelent wav    10124  11-25-94 11:49a 
+fantastc wav    23686  11-25-94 11:52a 
+right    wav    63532  11-25-94 11:43a 
+right1   wav     5412  11-25-94 11:48a 
+test     pas     4080  12-31-95  7:25p 
+turbo    dsk     1083  12-31-95  7:27p 
+waveplay pas     1430  11-25-94  3:30p 
+waveplay tpu     2480  11-25-94  3:30p 
+wrong1   wav     9819  11-25-94 11:23a 
+wrong2   wav     6960  11-25-94 11:29a 
+wrong3   wav    10095  11-25-94 11:37a 
+     208,500 bytes in 17 file(s)           223,232 bytes allocated
+
+    Total for:  d:\angelo\wav\game\*.*
+     208,500 bytes in 17 file(s)           223,232 bytes allocated
+
+    Total for:  d:\angelo\wav\*.*
+   1,649,732 bytes in 47 file(s)         1,693,696 bytes allocated
+
+ Directory of  d:\angelo\1-19-94\*.*
+
+.            <DIR>      6-24-96 11:25a 
+..           <DIR>      6-24-96 11:25a 
+320x400  pas     4982   3-12-93  9:15a 
+angelo   pas    30985   1-01-93  8:41a 
+b                4096   1-02-94 11:07p 
+backup2         14336   1-02-94 11:07p 
+bunny    liz    19597  12-17-93  8:44p 
+chklist  ms       108  12-30-93 11:30a 
+cons     liz     5044   1-07-94  9:32p 
+drallyey pas    15138   1-28-93  8:38a 
+effects  pas     2322  12-30-93  2:26p 
+file0000 chk      512           12:00a 
+fill     pas     4598  12-03-93  9:56p 
+foricons liz     7394   1-31-93  4:05a 
+formatok pas    30294   1-02-94 10:26p 
+iconload pas      366  11-28-93 11:18a 
+icons    liz     2851   1-31-93  4:00a 
+keyboard pas     4811   1-13-94  9:19p 
+keyboard tpu     4336   1-13-94  9:19p 
+keytest  pas      394   1-11-94  8:44p 
+letters  all    65000   1-07-94 11:00p 
+letters  liz     3370   1-08-94  5:37p 
+logo     liz     9812   2-02-93  6:26a 
+makelogo pas    26194   4-02-93  8:34p 
+modetest pas      424   1-01-93  1:12a 
+mouse    com    14368  10-24-93  1:19p 
+mouse    pas     2183   1-11-94 10:33p 
+msmouse  com    16318   1-25-90  3:30p 
+myicons  liz     9955  11-29-93  3:20p 
+myicons2 liz    13513  12-29-93  5:38p 
+mysound  pas      979  11-23-93  3:39p 
+mystring pas     1376   1-14-94  8:32p 
+mytimer  pas      379   6-03-92 11:21a 
+mytimer  tpu     1552  12-14-93  3:57p 
+newbunny liz    19587   1-31-93  5:15a 
+newdraw  pas    26120   1-12-94  9:37p 
+newdraw2 pas    16916   7-22-93  6:08a 
+newdraw3 pas    20849  11-23-93 10:40p 
+newdraw4 pas    23102  11-29-93  3:28p 
+newdraw5 pas    23659  12-30-93  1:38p 
+newdraw6 pas    25745   1-10-94 10:35p 
+newdraw7 pas    27544   1-14-94  9:01p 
+newest   pas    16984   1-14-94 10:41p 
+newint09 pas     3075   6-07-93  7:20p 
+newint09 tpu     2752  11-23-93  2:04p 
+noname   pas      358   1-14-94  8:34p 
+null           142623   4-05-94  7:57p 
+pyramid  pas     1180   1-28-93  6:45a 
+sample   liz     1120  12-29-93  1:31a 
+ship     liz    31108  12-29-93 11:59p 
+strmanip pas     1656   1-07-94 11:14p 
+testin5  5       1746  12-31-93  2:30a 
+testin55 pas    10521  12-31-93  4:49p 
+testin56 pas    10433  12-31-93  4:51p 
+testing  pas      691  12-30-93  1:42p 
+testing2 pas      777  12-30-93 10:43p 
+testing3 pas      533  12-31-93 12:14a 
+testing4 pas     1033  12-31-93  2:34a 
+testing5 pas     1852  12-31-93  4:00p 
+testing6 pas     1533  12-31-93  3:49p 
+tpx      dsk     1702  12-17-93  8:49p 
+tpx      psm    45829  12-17-93  8:49p 
+tpx      tp      4239  12-17-93  8:49p 
+turbo    dsk     1762   6-24-96 11:29a 
+turbo    tp      4189   6-24-96 11:29a 
+vgaliz   pas    42650  12-03-93  8:05p 
+vgaliza  pas    57135   1-10-94 10:27p 
+vgaliza2 pas    56452   1-14-94 10:12p 
+walk     liz    13267   2-02-93  6:56a 
+walk1    liz     7731   1-31-93  5:47a 
+wall     liz    34715  12-29-93 11:18p 
+   1,000,755 bytes in 71 file(s)         1,073,152 bytes allocated
+
+    Total for:  d:\angelo\1-19-94\*.*
+   1,000,755 bytes in 71 file(s)         1,073,152 bytes allocated
+
+    Total for:  d:\angelo\*.*
+  10,728,783 bytes in 967 file(s)       11,765,760 bytes allocated
+  14,123,008 bytes free

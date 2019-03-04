@@ -1,0 +1,511 @@
+Comparing files ANGEL.PS and ICON\ANGEL.PS
+FC: cannot open ICON\ANGEL.PS - No such file or directory
+
+Comparing files ANGELO.PAS and ICON\ANGELO.PAS
+FC: cannot open ICON\ANGELO.PAS - No such file or directory
+
+Comparing files ANGELO.PS and ICON\ANGELO.PS
+FC: cannot open ICON\ANGELO.PS - No such file or directory
+
+Comparing files ANGELO2.PAS and ICON\ANGELO2.PAS
+FC: cannot open ICON\ANGELO2.PAS - No such file or directory
+
+Comparing files ANGELO3.EXE and ICON\ANGELO3.EXE
+***** ANGELO3.EXE
+
+ò
+***** ICON\ANGELO3.EXE
+
+...
+ò
+*****
+
+***** ANGELO3.EXE
+ò
+...
+ò
+***** ICON\ANGELO3.EXE
+ò
+ò
+*****
+
+***** ANGELO3.EXE
+ò
+...
+<v¸
+***** ICON\ANGELO3.EXE
+ò
+...
+<v¸
+*****
+
+
+Comparing files ANGELO3.PAS and ICON\ANGELO3.PAS
+***** ANGELO3.PAS
+
+...
+
+***** ICON\ANGELO3.PAS
+
+procedure loadnext;forward;
+
+*****
+
+***** ANGELO3.PAS
+  begin
+    writeln(lst,'/Helvetica-Bold findfont');
+   {  if d then writeln('/Helvetica findfont');}
+***** ICON\ANGELO3.PAS
+  begin
+    writeln(lst,'/Helvetica findfont');
+   {  if d then writeln('/Helvetica findfont');}
+*****
+
+***** ANGELO3.PAS
+          if parenthesis=0 then
+          begin if nosl or (linenum>=sl) then write(lst,'(') end
+            else dec(parenthesis);
+***** ICON\ANGELO3.PAS
+          if parenthesis=0 then
+          begin if nosl or (linenum>sl) then write(lst,'(') end
+            else dec(parenthesis);
+*****
+
+***** ANGELO3.PAS
+        end;
+      if nosl or (linenum>=sl) then
+      write(lst,char(myptr(p^)[myofs]));
+***** ICON\ANGELO3.PAS
+        end;
+      if nosl or (linenum>sl) then
+      write(lst,char(myptr(p^)[myofs]));
+*****
+
+***** ANGELO3.PAS
+{    delay(100);}
+    if nosl or (linenum>=sl) then
+    begin
+***** ICON\ANGELO3.PAS
+{    delay(100);}
+    if nosl or (linenum>sl) then
+    begin
+*****
+
+***** ANGELO3.PAS
+    begin
+      if nosl or (linenum>=sl) then
+      writeln(lst,wtos(xp),' ',wtos(yp),' moveto');
+***** ICON\ANGELO3.PAS
+    begin
+      if nosl or (linenum>sl) then
+      writeln(lst,wtos(xp),' ',wtos(yp),' moveto');
+*****
+
+***** ANGELO3.PAS
+    end;
+...
+  yp:=yf;
+***** ICON\ANGELO3.PAS
+    end;
+...
+  yp:=yf;
+*****
+
+***** ANGELO3.PAS
+  xp:=xp+xinc;
+...
+{  if d then writeln('showpage');}
+***** ICON\ANGELO3.PAS
+  xp:=xp+xinc;
+...
+{  if d then writeln('showpage');}
+*****
+
+***** ANGELO3.PAS
+  size:=filesize(f);
+...
+    sizeremain:=size-sizetoread;
+***** ICON\ANGELO3.PAS
+  size:=filesize(f);
+...
+    sizeremain:=size-sizetoread;
+*****
+
+***** ANGELO3.PAS
+
+
+
+***** ICON\ANGELO3.PAS
+
+...
+
+*****
+
+***** ANGELO3.PAS
+    if paramcount>2 then d:=paramstr(3)='d';
+    if paramcount>3 then begin nosl:=false;val(paramstr(4),sl,code);end;
+    pinit;
+***** ICON\ANGELO3.PAS
+    if paramcount>2 then d:=paramstr(3)='d';
+    if paramcount>3 then begin nosl:=false;val(paramstr(4),sl,code);end else nosl:=true;
+    pinit;
+*****
+
+
+Comparing files CHARMANI.TPU and ICON\CHARMANI.TPU
+***** CHARMANI.TPU
+
+...
+
+***** ICON\CHARMANI.TPU
+
+...
+
+*****
+
+***** CHARMANI.TPU
+Rdefchar
+defcharget
+***** ICON\CHARMANI.TPU
+Rdefchar
+
+defcharget
+*****
+
+***** CHARMANI.TPU
+
+
+
+***** ICON\CHARMANI.TPU
+
+...
+
+*****
+
+***** CHARMANI.TPU
+
+$0ä‹Ð¸
+***** ICON\CHARMANI.TPU
+
+...
+$0ä‹Ð¸
+*****
+
+***** CHARMANI.TPU
+
+...
+Ä~ü&ˆEŠF&ˆEŠF0ä‹ÐŠF
+***** ICON\CHARMANI.TPU
+
+...
+Ä~ü&ˆEŠF&ˆEŠF0ä‹ÐŠF
+*****
+
+***** CHARMANI.TPU
+š
+...
+
+***** ICON\CHARMANI.TPU
+š
+...
+
+*****
+
+***** CHARMANI.TPU
+
+...
+0 
+***** ICON\CHARMANI.TPU
+
+
+*****
+
+
+Comparing files OUTCOME and ICON\OUTCOME
+FC: cannot open ICON\OUTCOME - No such file or directory
+
+Comparing files EDITCHAR.PAS and ICON\EDITCHAR.PAS
+FC: cannot open ICON\EDITCHAR.PAS - No such file or directory
+
+Comparing files EDITLETR.PAS and ICON\EDITLETR.PAS
+FC: cannot open ICON\EDITLETR.PAS - No such file or directory
+
+Comparing files GO.PAS and ICON\GO.PAS
+FC: cannot open ICON\GO.PAS - No such file or directory
+
+Comparing files GRAPHSTR.PAS and ICON\GRAPHSTR.PAS
+FC: cannot open ICON\GRAPHSTR.PAS - No such file or directory
+
+Comparing files HUFFMAN4.PAS and ICON\HUFFMAN4.PAS
+FC: cannot open ICON\HUFFMAN4.PAS - No such file or directory
+
+Comparing files HUFFMAN6.PAS and ICON\HUFFMAN6.PAS
+FC: cannot open ICON\HUFFMAN6.PAS - No such file or directory
+
+Comparing files KEYBOARD.PAS and ICON\KEYBOARD.PAS
+FC: cannot open ICON\KEYBOARD.PAS - No such file or directory
+
+Comparing files KEYBOARD.TPU and ICON\KEYBOARD.TPU
+***** KEYBOARD.TPU
+untouchkey 
+...
+
+***** ICON\KEYBOARD.TPU
+untouchkey 
+
+*****
+
+***** KEYBOARD.TPU
+
+...
+
+***** ICON\KEYBOARD.TPU
+
+
+
+*****
+
+***** KEYBOARD.TPU
+
+
+
+***** ICON\KEYBOARD.TPU
+
+
+*****
+
+***** KEYBOARD.TPU
+
+...
+
+***** ICON\KEYBOARD.TPU
+
+...
+
+*****
+
+***** KEYBOARD.TPU
+
+
+***** ICON\KEYBOARD.TPU
+
+...
+
+*****
+
+***** KEYBOARD.TPU
+4
+***** ICON\KEYBOARD.TPU
+*****
+
+
+Comparing files KEYTEST.PAS and ICON\KEYTEST.PAS
+FC: cannot open ICON\KEYTEST.PAS - No such file or directory
+
+Comparing files LASERIT.EXE and ICON\LASERIT.EXE
+FC: cannot open ICON\LASERIT.EXE - Too many open files
+
+Comparing files LAZERIT.EXE and ICON\LAZERIT.EXE
+FC: cannot open LAZERIT.EXE - Too many open files
+
+Comparing files LIZADRAW.PAS and ICON\LIZADRAW.PAS
+FC: cannot open LIZADRAW.PAS - Too many open files
+
+Comparing files LIZTOLCR.PAS and ICON\LIZTOLCR.PAS
+FC: cannot open LIZTOLCR.PAS - Too many open files
+
+Comparing files LIZTONOR.PAS and ICON\LIZTONOR.PAS
+FC: cannot open LIZTONOR.PAS - Too many open files
+
+Comparing files LOADTIFF.PAS and ICON\LOADTIFF.PAS
+FC: cannot open LOADTIFF.PAS - Too many open files
+
+Comparing files MAXIMUM.PAS and ICON\MAXIMUM.PAS
+FC: cannot open MAXIMUM.PAS - Too many open files
+
+Comparing files MAXIMUM2.PAS and ICON\MAXIMUM2.PAS
+FC: cannot open MAXIMUM2.PAS - Too many open files
+
+Comparing files MOUSE.PAS and ICON\MOUSE.PAS
+FC: cannot open MOUSE.PAS - Too many open files
+
+Comparing files MOUSE.TPU and ICON\MOUSE.TPU
+FC: cannot open MOUSE.TPU - Too many open files
+
+Comparing files MOUSE2.PAS and ICON\MOUSE2.PAS
+FC: cannot open MOUSE2.PAS - Too many open files
+
+Comparing files MOUSE2.TPU and ICON\MOUSE2.TPU
+FC: cannot open MOUSE2.TPU - Too many open files
+
+Comparing files MSMOUSE.COM and ICON\MSMOUSE.COM
+FC: cannot open MSMOUSE.COM - Too many open files
+
+Comparing files MYGAME.PAS and ICON\MYGAME.PAS
+FC: cannot open MYGAME.PAS - Too many open files
+
+Comparing files MYSTRING.PAS and ICON\MYSTRING.PAS
+FC: cannot open MYSTRING.PAS - Too many open files
+
+Comparing files MYSTRING.TPU and ICON\MYSTRING.TPU
+FC: cannot open MYSTRING.TPU - Too many open files
+
+Comparing files NEWDRAW7.PAS and ICON\NEWDRAW7.PAS
+FC: cannot open NEWDRAW7.PAS - Too many open files
+
+Comparing files NEWEST.PAS and ICON\NEWEST.PAS
+FC: cannot open NEWEST.PAS - Too many open files
+
+Comparing files NEWEST2.PAS and ICON\NEWEST2.PAS
+FC: cannot open NEWEST2.PAS - Too many open files
+
+Comparing files NEWINT09.PAS and ICON\NEWINT09.PAS
+FC: cannot open NEWINT09.PAS - Too many open files
+
+Comparing files NEWINT09.TPU and ICON\NEWINT09.TPU
+FC: cannot open NEWINT09.TPU - Too many open files
+
+Comparing files NONAM.PAS and ICON\NONAM.PAS
+FC: cannot open NONAM.PAS - Too many open files
+
+Comparing files NONAM2.PAS and ICON\NONAM2.PAS
+FC: cannot open NONAM2.PAS - Too many open files
+
+Comparing files NONAME.PAS and ICON\NONAME.PAS
+FC: cannot open NONAME.PAS - Too many open files
+
+Comparing files NONAME00.EXE and ICON\NONAME00.EXE
+FC: cannot open NONAME00.EXE - Too many open files
+
+Comparing files PRINTER.PAS and ICON\PRINTER.PAS
+FC: cannot open PRINTER.PAS - Too many open files
+
+Comparing files ROLFAZIL.DOC and ICON\ROLFAZIL.DOC
+FC: cannot open ROLFAZIL.DOC - Too many open files
+
+Comparing files ROLFAZIL.PAS and ICON\ROLFAZIL.PAS
+FC: cannot open ROLFAZIL.PAS - Too many open files
+
+Comparing files ROLFAZIL.TPU and ICON\ROLFAZIL.TPU
+FC: cannot open ROLFAZIL.TPU - Too many open files
+
+Comparing files SLIDE.PAS and ICON\SLIDE.PAS
+FC: cannot open SLIDE.PAS - Too many open files
+
+Comparing files SLIDE3.PAS and ICON\SLIDE3.PAS
+FC: cannot open SLIDE3.PAS - Too many open files
+
+Comparing files SLIDEW.PAS and ICON\SLIDEW.PAS
+FC: cannot open SLIDEW.PAS - Too many open files
+
+Comparing files SLIDEW.TPU and ICON\SLIDEW.TPU
+FC: cannot open SLIDEW.TPU - Too many open files
+
+Comparing files SNDLOAD.PAS and ICON\SNDLOAD.PAS
+FC: cannot open SNDLOAD.PAS - Too many open files
+
+Comparing files STRMANIP.PAS and ICON\STRMANIP.PAS
+FC: cannot open STRMANIP.PAS - Too many open files
+
+Comparing files TIFFTEST.EXE and ICON\TIFFTEST.EXE
+FC: cannot open TIFFTEST.EXE - Too many open files
+
+Comparing files TIFFTEST.PAS and ICON\TIFFTEST.PAS
+FC: cannot open TIFFTEST.PAS - Too many open files
+
+Comparing files TOARJ and ICON\TOARJ
+FC: cannot open TOARJ - Too many open files
+
+Comparing files TURBO.DRW and ICON\TURBO.DRW
+FC: cannot open TURBO.DRW - Too many open files
+
+Comparing files TURBO.DSK and ICON\TURBO.DSK
+FC: cannot open TURBO.DSK - Too many open files
+
+Comparing files TURBO.TPP and ICON\TURBO.TPP
+FC: cannot open TURBO.TPP - Too many open files
+
+Comparing files VGALIZA3.PAS and ICON\VGALIZA3.PAS
+FC: cannot open VGALIZA3.PAS - Too many open files
+
+Comparing files VGALIZA3.TPU and ICON\VGALIZA3.TPU
+FC: cannot open VGALIZA3.TPU - Too many open files
+
+Comparing files WINDOWS.PAS and ICON\WINDOWS.PAS
+FC: cannot open WINDOWS.PAS - Too many open files
+
+Comparing files ZIPPER.PAS and ICON\ZIPPER.PAS
+FC: cannot open ZIPPER.PAS - Too many open files
+
+Comparing files ZIPPER2.PAS and ICON\ZIPPER2.PAS
+FC: cannot open ZIPPER2.PAS - Too many open files
+
+Comparing files NEWDRAW7.EXE and ICON\NEWDRAW7.EXE
+FC: cannot open NEWDRAW7.EXE - Too many open files
+
+Comparing files LIZADRAW.EXE and ICON\LIZADRAW.EXE
+FC: cannot open LIZADRAW.EXE - Too many open files
+
+Comparing files NEWEST2.EXE and ICON\NEWEST2.EXE
+FC: cannot open NEWEST2.EXE - Too many open files
+
+Comparing files EXP.EXE and ICON\EXP.EXE
+FC: cannot open EXP.EXE - Too many open files
+
+Comparing files TP4GIF.PAS and ICON\TP4GIF.PAS
+FC: cannot open TP4GIF.PAS - Too many open files
+
+Comparing files TP4GIF.EXE and ICON\TP4GIF.EXE
+FC: cannot open TP4GIF.EXE - Too many open files
+
+Comparing files TPX.PSM and ICON\TPX.PSM
+FC: cannot open TPX.PSM - Too many open files
+
+Comparing files TPX.DSK and ICON\TPX.DSK
+FC: cannot open TPX.DSK - Too many open files
+
+Comparing files ANGELO2.EXE and ICON\ANGELO2.EXE
+FC: cannot open ANGELO2.EXE - Too many open files
+
+Comparing files KEYTEST.EXE and ICON\KEYTEST.EXE
+FC: cannot open KEYTEST.EXE - Too many open files
+
+Comparing files KEEP2.MAP and ICON\KEEP2.MAP
+FC: cannot open KEEP2.MAP - Too many open files
+
+Comparing files KEEP2.PAS and ICON\KEEP2.PAS
+FC: cannot open KEEP2.PAS - Too many open files
+
+Comparing files NEWINT08.EXE and ICON\NEWINT08.EXE
+FC: cannot open NEWINT08.EXE - Too many open files
+
+Comparing files NEWINT08.PAS and ICON\NEWINT08.PAS
+FC: cannot open NEWINT08.PAS - Too many open files
+
+Comparing files KEEP.EXE and ICON\KEEP.EXE
+FC: cannot open KEEP.EXE - Too many open files
+
+Comparing files KEEP.PAS and ICON\KEEP.PAS
+FC: cannot open KEEP.PAS - Too many open files
+
+Comparing files KEEP2.EXE and ICON\KEEP2.EXE
+FC: cannot open KEEP2.EXE - Too many open files
+
+Comparing files KEEP3.PAS and ICON\KEEP3.PAS
+FC: cannot open KEEP3.PAS - Too many open files
+
+Comparing files KEEP3.EXE and ICON\KEEP3.EXE
+FC: cannot open KEEP3.EXE - Too many open files
+
+Comparing files CHGTIME.EXE and ICON\CHGTIME.EXE
+FC: cannot open CHGTIME.EXE - Too many open files
+
+Comparing files TURBO.TP and ICON\TURBO.TP
+FC: cannot open TURBO.TP - Too many open files
+
+Comparing files CHGTIME.PAS and ICON\CHGTIME.PAS
+FC: cannot open CHGTIME.PAS - Too many open files
+
+Comparing files CHKLIST.MS and ICON\CHKLIST.MS
+FC: cannot open CHKLIST.MS - Too many open files
+

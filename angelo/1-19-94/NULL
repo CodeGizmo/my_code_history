@@ -1,0 +1,3837 @@
+VGA_SEGMENT     equ 0a000h       ;
+SC_INDEX        equ 3c4h         ;Sequence Controller Index register
+GC_INDEX        equ 3ceh         ;Graphics Controller Index register
+CRTC_INDEX      equ 3d4h
+MAP_MASK        equ 2            ;Map Mask register index in SC
+MEMORY_MODE     equ 4
+MAX_SCAN_LINE   equ 9
+START_ADDRESS_HIGH equ 0ch
+UNDERLINE	    equ 14h
+MODE_CONTROL    equ 17h
+READ_MAP        equ 4            ;Read Map register index in GC
+GRAPHICS_MODE   equ 5
+MISCELLANEOUS   equ 6
+SCREEN_WIDTH    equ 320          ;# of pixels across screen
+SCREEN_HEIGHT   equ 400
+WORD_OUTS_OK    equ 0            ;set to 0 to assemble for
+                                                                                  ; computer that can't handle
+                                                                                  ; words outs to indexed VGA registers
+
+_DATA segment public byte 'DATA'
+_DATA           ends
+
+OUT_WORD        macro
+if WORD_OUTS_OK
+                        out dx,ax
+else
+                  out  dx,al
+                  inc  dx
+                  xchg ah,al
+                  out  dx,al
+                  dec  dx
+                  xchg ah,al
+endif
+						endm
+
+CONSTANT_TO_INDEXED_REGISTER macro ADDRESS,INDEX,VALUE
+			 mov  dx,ADDRESS
+			 mov  ax,(VALUE shl 8) + INDEX
+			 OUT_WORD
+			 endm
+
+
+		
+
+_TEXT     segment byte public 'CODE'
+          assume cs:_TEXT,ds:_DATA
+
+; void Set320x400Mode()
+;
+; Returns: nothing
+
+						public _Set320x400Mode
+_Set320x400Mode proc far
+					 mov  ax,0013h
+					 int  10h
+
+					 mov  dx,SC_INDEX
+					 mov  al,MEMORY_MODE
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 and  al,not 08h
+					 or   al,04h
+					 out  dx,al
+					 mov  dx,GC_INDEX
+					 mov  al,GRAPHICS_MODE
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 and  al,not 10h
+					 out  dx,al
+					 dec  dx
+
+					 mov  al,MISCELLANEOUS
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 and  al,not 02h
+					 out  dx,al
+
+					 CONSTANT_TO_INDEXED_REGISTER SC_INDEX,MAP_MASK,0fh
+
+					 mov  ax,VGA_SEGMENT
+					 mov  es,ax
+					 sub  di,di
+					 mov  ax,di
+					 mov  cx,8000h
+					 cld
+					 rep  stosw
+
+					 mov  dx,CRTC_INDEX
+					 mov  al,MAX_SCAN_LINE
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 and  al,not 1fh
+					 out  dx,al
+					 dec  dx
+
+					 mov  al,UNDERLINE
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 and  al,not 40h
+					 out  dx,al
+					 dec  dx
+					 mov  al,MODE_CONTROL
+					 out  dx,al
+					 inc  dx
+					 in   al,dx
+					 or   al,40h
+
+					 out  dx,al
+					 ret
+_Set320x400Mode endp
+
+
+
+DParms struc
+                 dw ?
+                 dw ?
+DrawX  dw ?
+DrawY  dw ?
+Color  dw ?   ; 0-255
+DParms ends
+
+; void Draw320x400Dot(int X,int Y, int Color)
+;
+; Returns: Nothing
+
+					  public _Draw320x400Dot
+_Draw320x400Dot proc far
+                 push  bp
+                 mov   bp,sp
+                 push  si
+                 push  di
+                 mov   ax,VGA_SEGMENT
+                 mov   es,ax
+                 mov   ax,SCREEN_WIDTH/4
+                                                ;there are 4 pixels at each address, so
+                                                ; each 360-pixel row is 90 bytes wide
+                                                ; in each plane
+
+                 mul   [bp+DrawY]
+                 mov   di,[bp+DrawX]
+                 shr   di,1
+                 shr   di,1
+                 add   di,ax
+                 mov   cl,byte ptr [bp+DrawX]
+                 and   cl,3
+                 mov   ah,1
+                 shl   ah,cl
+
+                 mov   al,MAP_MASK
+                 mov   dx,SC_INDEX
+                 OUT_WORD
+
+                 mov   al,byte ptr [bp+Color]
+                 stosb
+                 pop   di
+                 pop   si
+                 pop   bp
+                 ret
+_Draw320x400Dot endp
+
+RParms struc
+                 dw ?
+                 dw ?
+ReadX  dw ?
+ReadY  dw ?
+RParms ends
+
+; int Read320x400Mode(int X,int Y)
+;
+; Returns: pixel color
+					  public _Read320x400Dot
+_Read320x400Dot proc far
+                 push  bp
+                 mov   bp,sp
+                 push  si
+                 push  di
+                 mov   ax,VGA_SEGMENT
+                 mov   es,ax
+                 mov   ax,SCREEN_WIDTH/4
+
+                 mul   [bp+DrawY]
+                 mov   si,[bp+DrawX]
+                 shr   si,1
+                 shr   si,1
+                 add   si,ax
+                 mov   ah,byte ptr [bp+DrawX]
+
+                 and   ah,3
+                 mov   al,READ_MAP
+                 mov   dx,GC_INDEX
+                 OUT_WORD
+
+                 lods  byte ptr es:[si]
+                 sub   ah,ah
+                 pop   di
+                 pop   si
+                 pop   bp
+_Read320x400Dot endp
+_TEXT ends
+                end
+Program DrawGame;
+uses keyboard,vgaliza,crt;
+var
+  Quit                          :boolean;
+  p                             :pointer;
+  red,grn,blu                   :array[0..255]of byte;
+  Dumb,dumb2                    :byte;
+  dumw,dumw2                    :word;
+  brightness                    :byte;
+  savemem                      :array[0..4095]of byte;
+  boundpos                      :integer;
+  boxx1,boxx2,boxy1,boxy2       :integer;
+  lx,ly,x,y,x1,y1,x2,y2         :integer;
+  mouseon                       :boolean;
+  amaxx,amaxy,aminx,aminy       :integer;
+
+var l,m,r,ll,lm,lr              :boolean;
+    bot,lbot,botcount           :byte;
+    mybot                       :array[0..255]of byte;
+    cancel                      :boolean;
+
+procedure giveme;
+begin
+  if mouseon then
+  begin
+    if bot=0 then botcount:=0;
+    lbot:=bot;
+    ll:=l;lm:=m;lr:=r;
+    asm
+      mov  ax,3
+      int  33h
+      mov  bot,bl
+    end;
+    l:=bot and 1=1;
+    r:=bot and 2=2;
+    m:=bot and 4=4;
+
+    if (lbot<>bot)and(botcount<250)then
+    begin
+      if (ll<>l)and l then
+      begin
+        inc(botcount);
+        mybot[botcount]:=1;
+      end;
+      if (lm<>m)and m then
+      begin
+        inc(botcount);
+        mybot[botcount]:=2;
+      end;
+      if (lr<>r)and r then
+      begin
+        inc(botcount);
+        mybot[botcount]:=3;
+      end;
+    end;
+  end;
+end;
+
+procedure addmousemove;
+begin
+  if mouseon then
+  begin
+    lx:=x;ly:=y;
+    asm
+      mov  ax,0bh
+      int  33h
+      add  x,cx
+      mov  cx,x
+      add  y,dx
+      mov  dx,y
+      cmp  cx,amaxx
+      jle  @a1
+      mov  cx,amaxx
+      mov  x,cx
+      jmp  @a2
+  @a1:cmp  cx,aminx
+      jge  @a2
+      mov  cx,aminx
+      mov  x,cx
+  @a2:cmp  dx,amaxy
+      jle  @a3
+      mov  dx,amaxy
+      mov  y,dx
+      jmp  @a4
+  @a3:cmp  dx,aminy
+      jge  @a4
+      mov  dx,aminy
+      mov  y,dx
+  @a4:
+    end;
+  end;
+end;{addmousemove}
+
+procedure putpen;
+begin
+  if x<160 then
+  if y<100 then
+  begin
+    yeyan(x,y,15);
+    line(x+1,y+1,x+4,y+4,c);
+    line(x+1,y,x+6,y+5,14);
+    line(x,y+1,x+5,y+6,14);
+    line(x+4,y+5,x+5,y+4,12);
+    line(x+5,y+6,x+6,y+5,12);
+    yeyan(x+5,y+5,12);
+  end else
+  begin
+    yeyan(x,y,15);
+    line(x+1,y-1,x+4,y-4,c);
+    line(x+1,y,x+6,y-5,14);
+    line(x,y-1,x+5,y-6,14);
+    line(x+4,y-5,x+5,y-4,12);
+    line(x+5,y-6,x+6,y-5,12);
+    yeyan(x+5,y-5,12);
+  end else if y>100 then
+  begin
+    yeyan(x,y,15);
+    line(x-1,y-1,x-4,y-4,c);
+    line(x-1,y,x-6,y-5,14);
+    line(x,y-1,x-5,y-6,14);
+    line(x-4,y-5,x-5,y-4,12);
+    line(x-5,y-6,x-6,y-5,12);
+    yeyan(x-5,y-5,12);
+  end else
+  begin
+    yeyan(x,y,15);
+    line(x-1,y+1,x-4,y+4,c);
+    line(x-1,y,x-6,y+5,14);
+    line(x,y+1,x-5,y+6,14);
+    line(x-4,y+5,x-5,y+4,12);
+    line(x-5,y+6,x-6,y+5,12);
+    yeyan(x-5,y+5,12);
+  end;
+end;{putpen}
+
+procedure boxsave(x1,y1,x2,y2:word);
+begin
+  boundpos:=0;
+  if x1>x2 then begin dumw:=x1;x1:=x2;x2:=dumw end;
+  if y1>y2 then begin dumw:=y1;y1:=y2;y2:=dumw end;
+  boxx1:=x1; boxx2:=x2; boxy1:=y1; boxy2:=y2;
+  for dumw:=x1 to x2 do begin
+    savemem[boundpos]:=yeyun(dumw,y1);
+    inc(boundpos); end;
+  for dumw:=y1 to y2 do begin
+    savemem[boundpos]:=yeyun(x2,dumw);
+    inc(boundpos); end;
+  for dumw:=x2 downto x1 do begin
+    savemem[boundpos]:=yeyun(dumw,y2);
+    inc(boundpos); end;
+  for dumw:=y2 downto y1 do begin
+    savemem[boundpos]:=yeyun(x1,dumw);
+    inc(boundpos); end;
+end;{boxsave}
+
+procedure boxrestore;
+begin
+  boundpos:=0;
+  for dumw:=boxx1 to boxx2 do begin
+    yeyan(dumw,y1,savemem[boundpos]);
+    inc(boundpos); end;
+  for dumw:=boxy1 to boxy2 do begin
+    yeyan(x2,dumw,savemem[boundpos]);
+    inc(boundpos); end;
+  for dumw:=boxx2 downto boxx1 do begin
+    yeyan(dumw,y2,savemem[boundpos]);
+    inc(boundpos); end;
+  for dumw:=boxy2 downto boxy1 do begin
+    yeyan(x1,dumw,savemem[boundpos]);
+    inc(boundpos); end;
+end;{boxrestore}
+
+var
+  boundshift:byte;
+  boundcolor:byte;
+
+procedure myboxer;
+begin
+  if boundshift>=4 then begin boundshift:=0; inc(boundcolor);end;
+  boundpos:=0;
+  for dumw:=boxx1 to boxx2 do begin
+    if (boundpos and 3)=boundshift then
+      yeyan(dumw,boxy1,boundcolor+boundpos)else
+      yeyan(dumw,boxy1,savemem[boundpos]);
+    inc(boundpos);end;
+  for dumw:=boxy1 to boxy2 do begin
+    if (boundpos and 3)=boundshift then
+      yeyan(boxx2,dumw,boundcolor+boundpos)else
+    yeyan(boxx2,dumw,savemem[boundpos]);
+    inc(boundpos);
+  end;
+  for dumw:=boxx2 downto boxx1 do begin
+    if (boundpos and 3)=boundshift then
+      yeyan(dumw,boxy2,boundcolor+boundpos)else
+    yeyan(dumw,boxy2,savemem[boundpos]);
+    inc(boundpos);
+  end;
+  for dumw:=boxy2 downto boxy1 do begin
+    if (boundpos and 3)=boundshift then
+      yeyan(boxx1,dumw,boundcolor+boundpos)else
+    yeyan(boxx1,dumw,savemem[boundpos]);
+    inc(boundpos);
+  end;
+  inc(boundshift);
+end;{MyBoxer}
+
+procedure getspace;
+begin
+  repeat
+    addmousemove;
+    putpen;{showpos;}
+    giveme;
+    if l or enter then
+    begin
+      while bot<>0 do giveme;
+      x1:=x;y1:=y;
+      boxsave(x1,y1,x,y);
+      repeat
+        addmousemove;
+        {showpos;}
+        giveme;
+        if(x<>lx)or(y<>ly)then
+        begin
+          boxrestore;
+          boxsave(x1,y1,x,y);
+        end;
+        MyBoxer;
+      until(esc)or(l)or(r);
+      if l then x2:=x;y2:=y;
+      boxrestore;
+      while r do giveme;
+    end;
+  until(esc)or(r)or(l);
+  while bot<>0 do giveme;
+  if x1>x2 then begin dumw:=x1;x1:=x2;x2:=dumw end;
+  if y1>y2 then begin dumw:=y1;y1:=y2;y2:=dumw end;
+end;{getspace}
+
+procedure Getaction;
+begin
+  addmousemove;
+  giveme;
+  if esc then quit:=true;
+end;{GetAction}
+
+procedure DoAction;
+begin
+  myboxer;
+  putpen;
+end;{Do Action}
+
+procedure InitProg;
+begin
+  gotomyint9;
+  Quit:=false;
+  getmem(p,65535);
+
+  vgamode(1);
+  amaxx:=319;amaxy:=199;aminx:=0;aminy:=0;
+  lx:=159;x:=159;ly:=99;y:=99;
+  mouseon:=true;
+  for dumb:=0 to 255 do begin
+                          mygetdac(dumb,red[dumb],grn[dumb],blu[dumb]);
+                          myup(dumb,0,0,0);
+                        end;
+  aload('logo.liz',p^);
+  uncompress(p^,ptr(pseg,pofs)^);
+  for dumb2:=0 to 63 do
+  begin
+    retr;
+    retr;
+    for dumb:=0 to 255 do myup(dumb,red[dumb]*dumb2 div 63,
+                                  grn[dumb]*dumb2 div 63,
+                                  blu[dumb]*dumb2 div 63);
+  end;
+  boxsave(50,50,250,150);
+end;{InitProg}
+
+procedure ExitProg;
+begin
+  for dumb2:=63 downto 0 do
+  begin
+    retr;
+    retr;
+    for dumb:=0 to 255 do myup(dumb,red[dumb]*dumb2 div 63,
+                                  grn[dumb]*dumb2 div 63,
+                                  blu[dumb]*dumb2 div 63);
+  end;
+  vgamode(mtext);
+  writeln('Have a Nice DrawGame!... Goodluck!');
+  goaway;
+  freemem(p,65535);
+end;{ExitProg}
+
+begin
+  InitProg;
+  repeat
+    getaction;
+    doaction;
+  until Quit;
+  repeat
+    getaction;
+    doaction;
+  until Quit or r;
+  ExitProg;
+end.   *)
+
+
+
+
+
+
+
+
+program tester;
+uses keyboard;
+begin
+  gotomyint9;
+  repeat
+    writeln(myreadkey);
+  until mykey[1]<>0;
+  goaway;
+end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*program Drawing_Kit{version 1.10};
+uses keyboard,vgaliz,crt;
+var
+  dumbyte,dumbyte2              :byte;
+  dumword,dumword2              :word;
+  c,lcc,paint                   :byte;
+  x,y,lx,ly,x1,y1,x2,y2         :integer;
+  miny,maxy,minx,maxx           :word;
+  ch                            :byte;
+  p,pen,boxp,getp,largesave     :pointer;
+  boxseg,boxofs                 :word;
+  bigx,bigy,lbigx,lbigy         :integer;
+  largeleft                     :boolean;
+  good_to_enlarge               :boolean;
+
+var
+  rcount:byte;
+  linelx,linely:integer;
+  yeyan_method:byte;
+  mouseon:boolean;
+
+procedure beep;
+begin
+{  sound(500);
+  delay(100);
+  nosound;}
+end;{beep}
+
+var cur_pos:word;
+procedure boxsave(x1,y1,x2,y2:word);
+begin
+  cur_pos:=0;
+  if x1>x2 then begin dumword:=x1;x1:=x2;x2:=dumword end;
+  if y1>y2 then begin dumword:=y1;y1:=y2;y2:=dumword end;
+  for dumword:=x1 to x2 do begin
+    mem[boxseg:boxofs+cur_pos]:=yeyun(dumword,y1);
+    inc(cur_pos); end;
+  for dumword:=y1 to y2 do begin
+    mem[boxseg:boxofs+cur_pos]:=yeyun(x2,dumword);
+    inc(cur_pos); end;
+  for dumword:=x2 downto x1 do begin
+    mem[boxseg:boxofs+cur_pos]:=yeyun(dumword,y2);
+    inc(cur_pos); end;
+  for dumword:=y2 downto y1 do begin
+    mem[boxseg:boxofs+cur_pos]:=yeyun(x1,dumword);
+    inc(cur_pos); end;
+end;{boxsave}
+
+procedure boxrestore(x1,y1,x2,y2:word);
+begin
+  cur_pos:=0;
+  if x1>x2 then begin dumword:=x1;x1:=x2;x2:=dumword end;
+  if y1>y2 then begin dumword:=y1;y1:=y2;y2:=dumword end;
+  for dumword:=x1 to x2 do begin
+    yeyan(dumword,y1,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos); end;
+  for dumword:=y1 to y2 do begin
+    yeyan(x2,dumword,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos); end;
+  for dumword:=x2 downto x1 do begin
+    yeyan(dumword,y2,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos); end;
+  for dumword:=y2 downto y1 do begin
+    yeyan(x1,dumword,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos); end;
+end;{boxrestore}
+
+var cur_cpat    :word;
+    cur_fc      :byte;
+    cur_dot     :shortint;
+procedure boxer(x1,y1,x2,y2:word);
+begin
+  cur_cpat:=cur_fc shl 2;
+  cur_pos:=0;
+  if (cur_dot>3)or(cur_dot<0)then cur_dot:=0;
+  if x1>x2 then begin dumword:=x1;x1:=x2;x2:=dumword end;
+  if y1>y2 then begin dumword:=y1;y1:=y2;y2:=dumword end;
+  for dumword:=x1 to x2 do
+  begin
+    if(cur_cpat and 3)=cur_dot then yeyan(dumword,y1,cur_cpat shr 2)
+      else yeyan(dumword,y1,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos);
+    inc(cur_cpat);
+  end;
+  for dumword:=y1 to y2 do
+  begin
+    if(cur_cpat and 3)=cur_dot then yeyan(x2,dumword,cur_cpat shr 2)
+      else yeyan(x2,dumword,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos);
+    inc(cur_cpat);
+  end;
+  for dumword:=x2 downto x1 do
+  begin
+    yeyan(dumword,y2,cur_cpat shr 2);
+    if(cur_cpat and 3)=cur_dot then yeyan(dumword,y2,cur_cpat shr 2)
+      else yeyan(dumword,y2,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos);
+    inc(cur_cpat);
+  end;
+  for dumword:=y2 downto y1 do
+  begin
+    yeyan(x1,dumword,cur_cpat shr 2);
+    if(cur_cpat and 3)=cur_dot then yeyan(x1,dumword,cur_cpat shr 2)
+      else yeyan(x1,dumword,mem[boxseg:boxofs+cur_pos]);
+    inc(cur_pos);
+    inc(cur_cpat);
+  end;
+  if cur_dot=0 then
+  begin
+    inc(cur_fc);
+    cur_dot:=3;
+  end else dec(cur_dot);
+end;{boxer}
+
+procedure putpen;
+begin
+  if x<160 then
+  if y<100 then
+  begin
+    yeyan(x,y,15);
+    line(x+1,y+1,x+4,y+4,c);
+    line(x+1,y,x+6,y+5,14);
+    line(x,y+1,x+5,y+6,14);
+    line(x+4,y+5,x+5,y+4,12);
+    line(x+5,y+6,x+6,y+5,12);
+    yeyan(x+5,y+5,12);
+  end else
+  begin
+    yeyan(x,y,15);
+    line(x+1,y-1,x+4,y-4,c);
+    line(x+1,y,x+6,y-5,14);
+    line(x,y-1,x+5,y-6,14);
+    line(x+4,y-5,x+5,y-4,12);
+    line(x+5,y-6,x+6,y-5,12);
+    yeyan(x+5,y-5,12);
+  end else if y>100 then
+  begin
+    yeyan(x,y,15);
+    line(x-1,y-1,x-4,y-4,c);
+    line(x-1,y,x-6,y-5,14);
+    line(x,y-1,x-5,y-6,14);
+    line(x-4,y-5,x-5,y-4,12);
+    line(x-5,y-6,x-6,y-5,12);
+    yeyan(x-5,y-5,12);
+  end else
+  begin
+    yeyan(x,y,15);
+    line(x-1,y+1,x-4,y+4,c);
+    line(x-1,y,x-6,y+5,14);
+    line(x,y+1,x-5,y+6,14);
+    line(x-4,y+5,x-5,y+4,12);
+    line(x-5,y+6,x-6,y+5,12);
+    yeyan(x-5,y+5,12);
+  end;
+end;{putpen}
+
+var l,m,r,ll,lm,lr              :boolean;
+    bot,lbot,botcount           :byte;
+    mybot                       :array[0..255]of byte;
+    cancel                      :boolean;
+procedure giveme;
+begin
+  if mouseon then
+  begin
+    if bot=0 then botcount:=0;
+    lbot:=bot;
+    ll:=l;lm:=m;lr:=r;
+    asm
+      mov  ax,3
+      int  33h
+      mov  bot,bl
+    end;
+    l:=bot and 1=1;
+    r:=bot and 2=2;
+    m:=bot and 4=4;
+
+    if (lbot<>bot)and(botcount<250)then
+    begin
+      if (ll<>l)and l then
+      begin
+        inc(botcount);
+        mybot[botcount]:=1;
+      end;
+      if (lm<>m)and m then
+      begin
+        inc(botcount);
+        mybot[botcount]:=2;
+      end;
+      if (lr<>r)and r then
+      begin
+        inc(botcount);
+        mybot[botcount]:=3;
+      end;
+
+      if (bot=0)and(lr=true)then cancel:=true else cancel:=false;
+    end;
+  end;
+end;
+
+procedure addmousemove;
+begin
+  if mouseon then
+  begin
+    lx:=x;ly:=y;
+    asm
+      mov  ax,0bh
+      int  33h
+      add  x,cx
+      add  y,dx
+      cmp  x,319
+      jle  @a1
+      mov  x,319
+      jmp  @a2
+  @a1:cmp  x,0
+      jge  @a2
+      mov  x,0
+  @a2:cmp  y,199
+      jle  @a3
+      mov  y,199
+      jmp  @a4
+  @a3:cmp  y,0
+      jge  @a4
+      mov  y,0
+  @a4:
+    end;
+  end;
+end;{addmousemove}
+
+var showposmeth:byte;
+procedure showpos;
+var
+  a,c:byte;
+begin
+  if showposmeth=1 then
+  begin
+        if x<160 then
+          if y<100 then getthis(x,y,x+6,y+6,pen^)
+          else getthis(x,y-6,x+6,y,pen^)
+        else if y>100 then getthis(x-6,y-6,x,y,pen^)
+          else getthis(x-6,y,x,y+6,pen^);
+        putpen;
+        delay(10);
+        if x<160 then
+          if y<100 then putthis(x,y,pen^,0)
+          else putthis(x,y-6,pen^,0)
+        else if y>100 then putthis(x-6,y-6,pen^,0)
+          else putthis(x-6,y,pen^,0);
+  end else
+  if showposmeth=2 then
+  begin
+    lcc:=yeyun(x,y);
+    for dumbyte:=0 to 255  do
+    begin
+      inc(lcc);
+      yeyan(x,y,lcc);
+    end;
+  end;
+end;{showpos}
+
+var f:string;
+procedure obeyload;
+begin
+  goaway;
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p^);
+  putthis(0,0,p^,0);
+  gotomyint9;
+end;{obeyload}
+
+procedure obeysave;
+begin
+  goaway;
+  getthis(0,0,319,199,p^);
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  asave(f,p^,65000);
+  putthis(0,0,p^,0);
+  gotomyint9;
+end;{obeysave}
+
+procedure zipperns;
+begin
+  goaway;
+  compress(ptr(pseg,pofs)^,p^);
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  lizsave(f,p^);
+  uncompress(p^,ptr(pseg,pofs)^);
+  gotomyint9;
+end;{zipperns}
+
+procedure unzipperns;
+begin
+  goaway;
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p^);
+  uncompress(p^,ptr(pseg,pofs)^);
+  gotomyint9;
+end;{unzipperns}
+
+procedure zipperns2;
+begin
+  goaway;
+  implode(ptr(pseg,pofs)^,p^);
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  lizsave(f,p^);
+  explode(p^,ptr(pseg,pofs)^);
+  gotomyint9;
+end;{zipperns}
+
+procedure unzipperns2;
+begin
+  goaway;
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p^);
+  explode(p^,ptr(pseg,pofs)^);
+  gotomyint9;
+end;{unzipperns}
+
+var
+  script:array[1..255]of byte;
+  firstfilm,lastfilm:byte;
+  xsize,ysize:byte;
+  direction:boolean;
+  xinc,yinc:integer;
+  xbpos,ybpos:integer;
+
+procedure obey_editani;{***********************************}
+begin
+  goaway;
+  getthis(0,0,319,199,p^);
+  repeat
+    gotoxy(1,1);clreol;
+    write('what? ');
+    readln(f);
+    if f='h'then
+    begin
+      gotoxy(1,1);
+      writeln('h - for help');
+      writeln('f - for firstfilm');
+      writeln('l - for lastfilm');
+      writeln('d - for delay');
+
+    end;
+    if f='f'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter firstfilm');
+      readln(firstfilm);
+      if firstfilm>160 then firstfilm:=160;
+      if firstfilm>lastfilm then direction:=false else direction:=true;
+    end;
+    if f='l'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter lastfilm');
+      readln(lastfilm);
+      if firstfilm>lastfilm then direction:=false else direction:=true;
+    end;
+    if f='d'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Starting from what film');
+      readln(dumbyte);
+      write('Ending at what film');
+      readln(dumbyte2);
+      write('How much delay do you want?(a delay is 1/1000 of a second) ');
+      readln(dumword);
+      for dumword2:=dumbyte to dumbyte2 do
+        script[dumword2]:=dumword;
+    end;
+    if f='x'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter x-inc');
+      readln(xinc);
+    end;
+    if f='y'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter y-inc');
+      readln(yinc);
+    end;
+    if f='a'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter xpos');
+      readln(xinc);
+    end;
+    if f='b'then
+    begin
+      gotoxy(1,1);clreol;
+      write('Enter ypos');
+      readln(ybpos);
+    end;
+  until f='q';
+  putthis(0,0,p^,0);
+  gotomyint9;
+end;{obey_editani}
+
+procedure getmovecommand;
+begin
+  asm
+    cli
+  end;
+  if(mykey[$47]or mykey[$48]or mykey[$49])<>0 then begin dec(y);key:=0;
+          if y<miny then begin y:=miny;beep end end;
+  if(mykey[$4f]or mykey[$50]or mykey[$51])<>0 then begin inc(y);key:=0;
+          if y>maxy then begin y:=maxy;beep end end;
+  if(mykey[$47]or mykey[$4b]or mykey[$4f])<>0 then begin dec(x);key:=0;
+          if x<minx then begin x:=minx;beep end end;
+  if(mykey[$49]or mykey[$4d]or mykey[$51])<>0 then begin inc(x);key:=0;
+          if x>maxx then begin x:=maxx;beep end end;
+  asm
+    sti
+  end;
+end;{getmovecommand}
+
+procedure getspace;
+begin
+  repeat
+    addmousemove;getmovecommand;
+    showpos;
+    giveme;
+    if l then
+    begin
+      while bot<>0 do giveme;
+      x1:=x;y1:=y;
+      boxsave(x1,y1,x,y);
+      repeat
+        addmousemove;getmovecommand;
+        showpos;
+        giveme;
+        if(x<>lx)or(y<>ly)then
+        begin
+          boxrestore(x1,y1,lx,ly);
+          boxsave(x1,y1,x,y);
+        end;
+        boxer(x1,y1,x,y);
+      until(l)or(r);
+      if l then x2:=x;y2:=y;
+      boxrestore(x1,y1,x,y);
+      while r do giveme;
+    end;
+  until(key=1)or(r)or(l);
+  while bot<>0 do giveme;
+  if x1>x2 then begin dumword:=x1;x1:=x2;x2:=dumword end;
+  if y1>y2 then begin dumword:=y1;y1:=y2;y2:=dumword end;
+end;{getspace}
+
+procedure colorado;
+var a,b:word;
+begin
+  for a:=0 to 31 do
+    for b:=0 to 7 do
+    begin
+      bar(1+a shl 3,1+b shl 3,a shl 3+6,b shl 3+6,b*32+a);
+      box(a shl 3,b shl 3,a shl 3+7,b shl 3+7,0);
+    end;
+  repeat
+    giveme;
+    addmousemove;getmovecommand;
+    if l then
+    begin
+      if (x<256)and(y<64)then
+      begin
+        box(a shr 3 shl 3,b shr 3 shl 3,a shr 3 shl 3+7,b shr 3 shl 3+7,0);
+        a:=x;b:=y;
+        box(x shr 3 shl 3,y shr 3 shl 3,x shr 3 shl 3+7,y shr 3 shl 3+7,8{x shr 3+(y shr 3)*32});
+        c:=x shr 3+(y shr 3)*32;
+      end;
+    end;
+    showpos;
+  until(key=1)or(r);
+  key:=0;
+end;{colorado}
+
+procedure refresh_division;
+begin
+      for dumword2:=0 to 3 do
+      for dumbyte2:=0 to 3 do
+      for dumbyte:=0 to 49 do
+      for dumword:=0 to 79 do
+        if (dumword2=3)or(dumbyte2=3)then
+          yeyan(dumword2+(dumword shl 2),dumbyte2+(dumbyte shl 2),0);
+end;
+
+procedure refresh_large;
+begin
+      for dumbyte:=0 to 49 do
+      for dumword:=0 to 79 do
+      for dumword2:=0 to 2 do
+      for dumbyte2:=0 to 2 do
+        yeyan(dumword2+(dumword shl 2),dumbyte2+(dumbyte shl 2),yeyun(bigx+dumword+2,bigy+dumbyte));
+end;
+procedure largeyeyan;
+begin
+            begin
+              pseg:=seg(p^);
+              yeyan(bigx+(x shr 2)+2,bigy+(y shr 2),c);
+              pseg:=$a000;
+              if largeleft then yeyan((x shr 2),y shr 2,c)else yeyan(240+(x shr 2),y shr 2,c);
+                for dumword2:=0 to 3 do
+                  for dumbyte2:=0 to 3 do
+                    if (dumword2<>3)and(dumbyte2<>3)then
+                      yeyan(dumword2+(x shr 2 shl 2),dumbyte2+(y shr 2 shl 2),c);
+            end;
+end;
+
+var ctofill:byte;
+procedure obeyenlarge;
+begin
+  getthis(0,0,319,199,p^);
+  boxsave(x,y,79+x,49+y);
+  boxer(x,y,79+x,49+y);
+  repeat
+    addmousemove;getmovecommand;
+    if x+79>maxx then x:=maxx-79;
+    if y+49>maxy then y:=maxy-49;
+    giveme;
+    if(lx<>x)or(ly<>y)then
+    begin
+      boxrestore(lx,ly,79+lx,49+ly);
+      boxsave(x,y,79+x,49+y);
+    end;
+    boxer(x,y,x+79,y+49);
+  until l or r;
+  boxrestore(lx,ly,x+79,y+49);
+
+  if l then
+  begin
+    while l do giveme;
+    good_to_enlarge:=true;
+    bigx:=x;bigy:=y;
+    refresh_division;
+
+    while good_to_enlarge do
+    begin
+      good_to_enlarge:=false;
+      gseg:=seg(p^);
+      gofs:=2;
+
+      for dumbyte:=0 to 49 do
+      for dumword:=0 to 79 do
+      for dumword2:=0 to 2 do
+      for dumbyte2:=0 to 2 do
+        yeyan(dumword2+(dumword shl 2),dumbyte2+(dumbyte shl 2),yeyun(bigx+dumword+2,bigy+dumbyte));
+      if x>160 then
+      begin
+        gseg:=$a000;
+        getthis(0,0,79,49,largesave^);
+        gseg:=seg(p^);
+        largeleft:=true;
+        movebar(0,0,79,49,bigx,bigy);
+      end else
+      begin
+        gseg:=$a000;
+        getthis(240,0,240+79,49,largesave^);
+        gseg:=seg(p^);
+        largeleft:=false;
+        movebar(240,0,240+79,49,bigx,bigy);
+      end;
+
+  {    gseg:=$a000;
+      repeat
+        addmousemove;
+        giveme;
+        if(bot=1)and((lx<>x)or(ly<>y))and(botcount=1)then bigline(lx,ly,x,y,c)
+          else if (botcount=1)and(bot=0)and(lbot=1)then bigyeyan(x,y,c);
+        showpos;
+      until r;}
+      repeat
+        addmousemove;getmovecommand;
+        giveme;
+        if (x=319)and(bigx+79<319) then   {********}
+        begin
+          if bigx+79+40<319 then begin bigx:=bigx+40;x:=160 end
+           else begin dumbyte:=319-79-bigx;bigx:=319-79;x:=x-(dumbyte shl 2)end;
+          good_to_enlarge:=true;
+        end;
+{********}
+        if (x=0)and(bigx>0) then   {********}
+        begin
+          if bigx-40>0 then begin bigx:=bigx-40;x:=160 end
+           else begin dumbyte:=bigx;bigx:=0;x:=(dumbyte shl 2)end;
+          good_to_enlarge:=true;
+        end;
+{********}
+        if (y=199)and(bigy+49<199) then   {********}
+        begin
+          if bigy+49+25<199 then begin bigy:=bigy+25;y:=100 end
+           else begin dumbyte:=199-49-bigy;bigy:=199-49;y:=y-(dumbyte shl 2)end;
+          good_to_enlarge:=true;
+        end;
+{********}
+        if (y=0)and(bigy>0) then   {********}
+        begin
+          if bigy-25>0 then begin bigy:=bigy-25;y:=100 end
+           else begin dumbyte:=bigy;bigy:=0;y:=(dumbyte shl 2)end;
+          good_to_enlarge:=true;
+        end;
+{********}
+        if x>160 then
+        begin
+          if not(largeleft)then
+          begin
+            putthis(240,0,largesave^,0);
+            gseg:=$a000;
+            getthis(0,0,79,49,largesave^);
+            gseg:=seg(p^);
+            largeleft:=true;
+            movebar(0,0,79,49,bigx+2,bigy);
+          end;
+        end else
+        begin
+          if largeleft then
+          begin
+            putthis(0,0,largesave^,0);
+            gseg:=$a000;
+            getthis(240,0,240+79,49,largesave^);
+            gseg:=seg(p^);
+            largeleft:=false;
+            movebar(240,0,240+79,49,bigx+2,bigy);
+          end;
+        end;
+              if (lbigx<>bigx+(x shr 2)+2)or(lbigy<>bigy+(y shr 2))then
+              begin
+                lbigx:=bigx+(x shr 2)+2;
+                lbigy:=bigy+(y shr 2);
+                ctofill:=yeyun(bigx+(x shr 2)+2,bigy+(y shr 2));
+              end;
+            if l and (botcount=1) then
+            begin
+
+              pseg:=seg(p^);
+
+              yeyan(bigx+(x shr 2)+2,bigy+(y shr 2),c);
+              pseg:=$a000;
+              if largeleft then yeyan((x shr 2),y shr 2,c)else yeyan(240+(x shr 2),y shr 2,c);
+                for dumword2:=0 to 3 do
+                  for dumbyte2:=0 to 3 do
+                    if (dumword2<>3)and(dumbyte2<>3)then
+                      yeyan(dumword2+(x shr 2 shl 2),dumbyte2+(y shr 2 shl 2),c);
+            end;
+            if (mybot[1]=1)and(mybot[2]=2)and(botcount=2)then
+            begin
+              pseg:=seg(p^);
+              pofs:=2;
+              yeyan(bigx+(x shr 2)+2,bigy+(y shr 2),ctofill);
+              filler2(bigx+(x shr 2),bigy+(y shr 2),c);
+              pseg:=$a000;
+              pofs:=0;
+              good_to_enlarge:=true;
+            end;
+        gseg:=$a000;
+        showpos;
+        gseg:=seg(p^);
+        if m then good_to_enlarge:=true;
+      until (r or m or good_to_enlarge)or((botcount=2)and((lx<>x)or(ly<>y))and(mybot[1]=1)and(mybot[2]=2));
+      if largeleft then putthis(0,0,largesave^,0)else putthis(240,0,largesave^,0);
+      if m and (botcount=1)then begin gseg:=$a000;colorado;gseg:=seg(p^);refresh_division;end;
+    end;
+  while bot<>0 do giveme;
+  gseg:=$a000;
+  putthis(0,0,p^,0);
+  end;
+end;{obeyenlarge}
+
+procedure obeyget;
+begin
+  getspace;
+  if ll=true then getthis(x1,y1,x2,y2,getp^);
+end;{obeyget}
+
+procedure obeyput;
+begin
+  getthis(0,0,319,199,p^);
+  putthis(x,y,getp^,0);
+  repeat
+    addmousemove;
+    giveme;
+    if(lx<>x)or(ly<>y)then begin putthis(0,0,p^,0);putthis(x,y,getp^,0)end;
+  until l or r;
+  if r then putthis(0,0,p^,0);
+  while bot<>0 do giveme;
+end;{obeyput}
+
+
+
+
+{var
+  width,height:integer;
+procedure makeicon;
+begin
+  getthis(0,0,319,199,p^);
+  write('Input the width you desire: ');
+  readln(width);
+  write('input the height you desire: ');
+  readln(height);
+
+  putthis(0,0,p^,0);
+end;}{makeicon}
+
+
+
+
+
+procedure getcolorcommand;
+begin
+  getthis(0,0,319,199,p^);
+  colorado;
+  putthis(0,0,p^,0);
+end;{getcolorcommand}
+
+
+
+
+procedure fetchmouse;
+begin
+  if mouseon then
+  begin
+    addmousemove;getmovecommand;
+    giveme;
+
+    case yeyan_method of
+
+      0:begin
+          if(bot=1)and((lx<>x)or(ly<>y))and(botcount=1)then line(lx,ly,x,y,c)
+            else if (botcount=1)and(bot=0)and(lbot=1)then yeyan(x,y,c);
+          if(botcount=2)and((lx<>x)or(ly<>y))and(mybot[1]=1)and(mybot[2]=2)then
+            filler(x,y,c)else if(botcount=2)and(mybot[1]=1)and(mybot[2]=2)
+                                and(bot=0)then filler(x,y,c);
+        end;
+      1:begin
+          if l then
+          begin
+          end;
+        end;
+    end;
+    if bot=0 then
+    begin
+      if (botcount=1) and lm then c:=yeyun(x,y);
+      if (botcount=3) and (mybot[1]=3)and(mybot[2]=2)and(mybot[3]=1)then clear;
+      if (botcount=2) and (mybot[1]=3)and(mybot[2]=1)then getcolorcommand;
+      if (botcount=2) and (mybot[1]=2)and(mybot[2]=3)then obeyget;
+      if (botcount=2) and (mybot[1]=2)and(mybot[2]=1)then obeyput;
+      if (botcount=2) and (mybot[1]=3)and(mybot[2]=2)then obeyenlarge;
+    end;
+  end;
+end;{fetchmouse}
+
+procedure pleasehelp;
+begin
+  getthis(0,0,319,199,p^);
+  vgamode(3);
+  gotoxy(1,1);
+  writeln('For the keyboard:');
+  writeln('< - this lets you draw lines as you move cursor key');
+  writeln('C - this lets you change the paint color');
+  writeln('L - this lets you load a saved drawing');
+  writeln('S - this lets you save your drawing');
+  writeln('Z - this saves your drawing for small amount of memory only in method 1');
+  writeln('U - this unload your drawing which has been save from method 1');
+  writeln('I - this saves your drawing for small amount of memory only in method 2');
+  writeln('E - this unload your drawing which has been save from method 2');
+  writeln('H - puts you in this window');
+  writeln;
+  writeln('For mouse button:');
+  writeln('left button(only) lets you draw while you move the cursor');
+  writeln('middle button(only) lets you get the color where you point the pen');
+  writeln('left+middle button lets you paint the space where you where');
+  writeln('middle+right buttons lets you cut a certain portion');
+  writeln('middle+left buttons lets you put the cut portion where you want');
+  writeln('right+middle+left buttons lets you erase the whole page');
+  writeln('right+middle buttons lets you enlarge a certain portion you want');
+  writeln('right+left buttons lets you choose a color for your pen');
+  writeln;
+  writeln('inside a cut,put,enlarge or others you use this buttons:');
+  writeln('right button is always use when cancelling');
+  writeln('left button is almost use in affirming or choosing');
+  ch:=myreadkey;
+  vgamode(1);
+  putthis(0,0,p^,0);
+end;{pleasehelp}
+
+procedure getkeycommand;
+begin
+  ch:=untouchkey;
+  if ch=$2e then getcolorcommand;
+  if ch=$26 then obeyload;
+  if ch=$1f then obeysave;
+  if ch=$2c then zipperns;
+  if ch=$16 then unzipperns;
+  if ch=$17 then zipperns2;
+  if ch=$12 then unzipperns2;
+  if ch=$23 then pleasehelp;
+  if ch=$30 then getspace;
+  if (ch=30)and(mykey[56]=0) then obey_editani;
+  if (ch=30)and(mykey[56]<>0)then
+  begin
+    getthis(0,0,319,199,p^);
+    repeat
+      if direction then
+      begin
+        for dumbyte2:=firstfilm to lastfilm do
+        begin
+          dumbyte:=dumbyte2-1;
+          movebar(300+xbpos,180+ybpos,319+xbpos,199+ybpos,(dumbyte mod 16)*20,(dumbyte div 16)*20);
+          xbpos:=xbpos+xinc;
+          ybpos:=ybpos+yinc;
+          delay(script[dumbyte]);
+        end
+      end
+      else
+      begin
+        for dumbyte2:=firstfilm downto lastfilm do
+        begin
+          dumbyte:=dumbyte2-1;
+          movebar(300+xbpos,180+ybpos,319+xbpos,199+ybpos,(dumbyte mod 16)*20,(dumbyte div 16)*20);
+          xbpos:=xbpos+xinc;
+          ybpos:=ybpos+yinc;
+          delay(script[dumbyte]);
+        end
+      end
+    until mykeypressed;
+    for dumbyte:=0 to 255 do mykey[dumbyte]:=0;
+    key:=0;
+    putthis(0,0,p^,0);
+  end;
+end;{getkeycommand}
+
+procedure initialize;
+begin
+  miny:=0;
+  maxy:=199;
+  minx:=0;
+  maxx:=319;
+  l:=false;
+  m:=false;
+  r:=false;
+  c:=15;
+  x:=maxx shr 1;
+  y:=maxy shr 1;
+  asm
+    mov ax,0
+    int 33h
+  end;
+  getmem(p,65535);
+  getmem(pen,51);
+  directvideo:=false;
+  showposmeth:=1;
+  getmem(boxp,1200);
+  boxseg:=seg(boxp^);
+  boxofs:=ofs(boxp^);
+  botcount:=0;
+  getmem(getp,65535);
+  getmem(largesave,4100);
+  yeyan_method:=0;
+  mouseon:=false;
+end;
+
+begin
+  clrscr;
+  initialize;
+  vgamode(1);
+  gotomyint9;
+
+
+  begin
+    f:='logo.liz';
+    aload(f,p^);
+    uncompress(p^,ptr(pseg,pofs)^);
+  end;{unzipperns}
+
+
+
+
+
+
+  repeat
+    fetchmouse;
+    if (mykeypressed)or(mykey2[$4c]<>0){tot_keys>2)}then
+    begin
+      getmovecommand;
+      if (mykey[$33]<>0)then begin yeyan(x,y,c);key:=0;end;
+      if mykeypressed then getkeycommand;
+{      mykey2[$4c]:=0;}
+    end;
+    showpos;
+  until(mykey[$38]<>0)and(mykey[$2d]<>0);
+  goaway;
+  for dumbyte2:=0 to 84 do
+  for dumbyte:=0 to 15 do box(dumbyte+dumbyte2,dumbyte+dumbyte2,319-dumbyte-dumbyte2,199-dumbyte-dumbyte2,dumbyte+16);
+
+  vgamode(3);
+  beep;
+  freemem(p,65535)
+end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Î<êMSDOS5.0  p @ 
+            )”NO NAME    FAT12   ˙3¿é–º |ªx 6≈7VSø>|π ¸Û§∆E˛ã|àM˘âG«>|˚Õry3¿9|tã|â |†|˜&||||É“ £P|âR|£I|âK|∏  ˜&|ã|√H˜ÛI|ÉK| ª ãR|°P|Ëí r∞Ë¨ rã˚π æÊ}Û¶u
+ç π Û¶tæû}Ë_ 3¿Õ^èèDÕXXXÎËãGHHä|2ˇ˜„I|K|ª π PRQË: rÿ∞ËT YZXrª É“ |‚‚ä.|ä$|ãI|°K|Í  p ¨
+¿t)¥ª ÕÎÚ;|s˜6|˛¬àO|3“˜6|à%|£M|¯√˘√¥ãM|±“Ê
+6O|ã ÜÈä$|ä6%|Õ√
+Non-System disk or disk errorkey when ready
+ 
+Disk Boot failure
+ IO      SYSMSDOS   SYS   U™ˇˇ   ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ                                             ˇœm‡o q ˇOu`wÄy†{¿}‡ Å É@Ö`áÄâ†ã¿ç‡è 	ë 	ì@	ï`	óÄ	ô†	õ¿	ù‡	ü 
+° 
+£@
+•`
+ˇè
+©†
+´¿
+≠‡
+Ø ± ≥@µ`∑Äπ†ª¿Ω‡ø ¡ √@≈`«Ä…†À¿Õ‡œ — ”@’`◊ÄŸ†€¿›‡ﬂ · „@Â`ÁÄÈ†Î¿Ì‡Ô Ò Û@ı`˜Ä˘†˚¿ˇˇˇˇ !AaÅ	°¡·!AaÅ°¡·!!#A%a'Å)°+¡-·/1!3A5a7Å9°;¡=·?A!CAEaGÅI°K¡M·OQ!SÒˇUÒˇWÅY°[¡]·_a!cAeagÅi°k¡m·oq!sAuawÅy°{¡}·Å!ÉAÖaáÅâ°ã¡ç·èë!ìAïaóÅô°õ¡ù·ü°!£A•aßÅ©°´Òˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˇˇ   ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ                                             ˇœm‡o q ˇOu`wÄy†{¿}‡ Å É@Ö`áÄâ†ã¿ç‡è 	ë 	ì@	ï`	óÄ	ô†	õ¿	ù‡	ü 
+° 
+£@
+•`
+ˇè
+©†
+´¿
+≠‡
+Ø ± ≥@µ`∑Äπ†ª¿Ω‡ø ¡ √@≈`«Ä…†À¿Õ‡œ — ”@’`◊ÄŸ†€¿›‡ﬂ · „@Â`ÁÄÈ†Î¿Ì‡Ô Ò Û@ı`˜Ä˘†˚¿ˇˇˇˇ !AaÅ	°¡·!AaÅ°¡·!!#A%a'Å)°+¡-·/1!3A5a7Å9°;¡=·?A!CAEaGÅI°K¡M·OQ!SÒˇUÒˇWÅY°[¡]·_a!cAeagÅi°k¡m·oq!sAuawÅy°{¡}·Å!ÉAÖaáÅâ°ã¡ç·èë!ìAïaóÅô°õ¡ù·ü°!£A•aßÅ©°´Òˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              CHKLIST MS            äÖ˝ 6   FM80    CO            •õü      FM80    COM           #ej A  FM800K  DOC           xj4k e  FMTMAS  DOC           rb◊s Ã  FMTMAS  EX2           hß öU FMTMAS  EX3           œlVöU FMTMAS  EXE           8∂ë˛ öU SDS                   =bmTr                                                                                                                                                                                                                                  Î<êMSDOS5.0  p @ 
+            )”NO NAME    FAT12   ˙3¿é–º |ªx 6≈7VSø>|π ¸Û§∆E˛ã|àM˘âG«>|˚Õry3¿9|tã|â |†|˜&||||É“ £P|âR|£I|âK|∏  ˜&|ã|√H˜ÛI|ÉK| ª ãR|°P|Ëí r∞Ë¨ rã˚π æÊ}Û¶u
+ç π Û¶tæû}Ë_ 3¿Õ^èèDÕXXXÎËãGHHä|2ˇ˜„I|K|ª π PRQË: rÿ∞ËT YZXrª É“ |‚‚ä.|ä$|ãI|°K|Í  p ¨
+¿t)¥ª ÕÎÚ;|s˜6|˛¬àO|3“˜6|à%|£M|¯√˘√¥ãM|±“Ê
+6O|ã ÜÈä$|ä6%|Õ√
+Non-System disk or disk errorkey when ready
+ 
+Disk Boot failure
+ IO      SYSMSDOS   SYS   U™ˇˇ   ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ                                             ˇœm‡o q ˇOu`wÄy†{¿}‡ Å É@Ö`áÄâ†ã¿ç‡è 	ë 	ì@	ï`	óÄ	ô†	õ¿	ù‡	ü 
+° 
+£@
+•`
+ˇè
+©†
+´¿
+≠‡
+Ø ± ≥@µ`∑Äπ†ª¿Ω‡ø ¡ √@≈`«Ä…†À¿Õ‡œ — ”@’`◊ÄŸ†€¿›‡ﬂ · „@Â`ÁÄÈ†Î¿Ì‡Ô Ò Û@ı`˜Ä˘†˚¿ˇˇˇˇ !AaÅ	°¡·!AaÅ°¡·!!#A%a'Å)°+¡-·/1!3A5a7Å9°;¡=·?A!CAEaGÅI°K¡M·OQ!SÒˇUÒˇWÅY°[¡]·_a!cAeagÅi°k¡m·oq!sAuawÅy°{¡}·Å!ÉAÖaáÅâ°ã¡ç·èë!ìAïaóÅô°õ¡ù·ü°!£A•aßÅ©°´Òˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ˇˇ   ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜     pˇ      ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ˜ˇ                                             ˇœm‡o q ˇOu`wÄy†{¿}‡ Å É@Ö`áÄâ†ã¿ç‡è 	ë 	ì@	ï`	óÄ	ô†	õ¿	ù‡	ü 
+° 
+£@
+•`
+ˇè
+©†
+´¿
+≠‡
+Ø ± ≥@µ`∑Äπ†ª¿Ω‡ø ¡ √@≈`«Ä…†À¿Õ‡œ — ”@’`◊ÄŸ†€¿›‡ﬂ · „@Â`ÁÄÈ†Î¿Ì‡Ô Ò Û@ı`˜Ä˘†˚¿ˇˇˇˇ !AaÅ	°¡·!AaÅ°¡·!!#A%a'Å)°+¡-·/1!3A5a7Å9°;¡=·?A!CAEaGÅI°K¡M·OQ!SÒˇUÒˇWÅY°[¡]·_a!cAeagÅi°k¡m·oq!sAuawÅy°{¡}·Å!ÉAÖaáÅâ°ã¡ç·èë!ìAïaóÅô°õ¡ù·ü°!£A•aßÅ©°´Òˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              CHKLIST MS            äÖ˝ 6   FM80    CO            •õü      FM80    COM           #ej A  FM800K  DOC           xj4k e  FMTMAS  DOC           rb◊s Ã  FMTMAS  EX2           hß öU FMTMAS  EX3           œlVöU FMTMAS  EXE           8∂ë˛ öU SDS                   =bmTr                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  MZF– Æ @ |ˇˇ$ ëØUR      l!  s!  ‘$  9*  @*  Y*  j*  R+  ã+  è+  Ω.  a/  YR0R»RÕR@R4RÓR_RéRvRgR&RË%R¢%Rá%R$*R˚)RN*R9*Ru1RP1R)1R1R20RË-Ru8RF8R48R"8R„=R©HRûHRÖzRZzR"zRzRÃ~RÅ~R;~R„ÖR◊ÖR«ÖRùÖRxâR àR§åRgåR;åR(ãRäRéR–ìR¬ìRRìR%ìR“ïR∑ïRiïRîR≈îR≥îRûîRïîRãîR≥úR§RßRï¶R‹≤R#≥R÷¿RgøR≠æRT√RC√Rµ¬R∆Rﬂ»Rj»Ra«RN«RÃ∆R√∆R3ÕRÿÀRÏ–Rã–R	”R~“R1“RU◊RÊ÷Rè÷Rq÷RY÷R÷R´’Rz’RB’R)’Rﬂ‘Rè‘RkŸR«ÿR∂ÿR≠ÿRLÿRÙ◊RõﬁRHﬁR8ﬁR8›R%›R›RÕ‹R£‹R.‹R'‡R ‡RÎﬂRTﬂRú‰RÉ‰R„RÒ‚R‰ÊRLÊRUÈR.ÈR˝ËR≠ÍRòÍRäÍRhÍR=ÍRÍRÍR‚ÈRƒÈR®ÈRQ˙QŸQ	Q*Q˜QQ.	Q6	QC
+QS
+Q^
+Q;QÙQQQ^QvQ•QÆQ¬Q˘Q                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             4DOS                     ë    ˇ                             ˇ                                                 Y≈                            
+                                            IRAF
+4DOS unrecoverable error   
+$ on device          üÆµú=M‘t1.ˆPu
+=.u.ˇ&ª.ˆO@uù˙.ˇ.[ùœ∏M‘_úÎÁ_∏›Dœù˚WÄˇwÈä«2‰—‡ã¯.ˇ•Jª .ã_.ä@Î”ªlÎÃ.Ä>@ uº.ˇπsΩ∫NSÈè .åû.â&ú˚Õ!ú˙.ˆOtP.ã_¥PÕ!X.Ä>aMt.ˆO u∫PTÎXêº@ÈSù.éû.ã&ú˚úP∆a ÄO0ªˇˇ¥HÕ!ˆOtã”¥HÕ!r+∞–â¢é¿¥IÕ!ˇ≤Xù[Y.ˇ6¢SÀâ1∫¥	Õ!ˆOÅu∞ˇ¥LÕ!˚Î˝˚PSã‹É√QRVWUPÅÁˇ ˆOuÉˇvø É«ÎVU3€¥YÕ!ã¯]^XˆPÄt	«› Èë ¸ˆƒÄt3é≈&˜D Ät&Éˇuø( Wé›É∆
+øAπ Û§_Ëú æ6Ë¿ Îø) Ëé æÊË≤ ∏3€Õ¥Õt2‰ÕÎÙ2‰Õ< rÂ<~w·P¥3€ÕX<ar, øπ ÚÆtæﬂËs ÎøÅÔâ>›æ„Ëc ]_^ZY[X†›œ.ˇ.†.ˆOu.ˆO u.ÄO˘Î¯˚À.ˇ6¢.ˇ6§ÀUãÏÅÏP SVã«ç~∞W≈6mˇ√2¿™^Ë ^[ãÂ]√SQ¨
+¿t¥3€ÕÎÛY[√ãﬁÉ∆ ãÄ˘ˇt:¡tÉ∆äÕ2ÌA—ÈÒÎÁã7¨ä»2ÌQÛ§Y˘Î4WF¸¨ä–2ˆÉ√Ë' ˛Xêº@ÈSù.éû.ã&ú˚úP∆a ÄO0ªˇˇ¥HÕ!ˆOtã”¥HÕ!r+∞–â¢é¿¥IÕ!ˇ≤Xù[Y.ˇ6¢SÀâ1∫¥	Õ!ˆOÅu∞ˇ¥LÕ!˚Î˝˚PSã‹É√QRVWUPÅÁˇ ˆOuÉˇvø É«ÎVU3€¥YÕ!ã¯]^XˆPÄt	«› Èë ¸ˆƒÄt3é≈&˜D Ät&Éˇuø( Wé›É∆
+øAπ Û§_Ëú æ6Ë¿ Îø) Ëé æÊË≤ ∏3€Õ¥Õt2‰ÕÎÙ2‰Õ< rÂ<~w·P¥3€ÕX<ar, øπ ÚÆtæﬂËs ÎøÅÔâ>›æ„Ëc ]_^ZY[X†›œ.ˇ.†.ˆOu.ˆO u.ÄO˘Î¯˚À.ˇ6¢.ˇ6§ÀUãÏÅÏP SVã«ç~∞W≈6mˇ√2¿™^Ë ^[ãÂ]√SQ¨
+¿t¥3€ÕÎÛY[√ãﬁÉ∆ ãÄ˘ˇt:¡tÉ∆äÕ2ÌA—ÈÒÎÁã7¨ä»2ÌQÛ§Y˘Î4WF¸¨ä–2ˆÉ√Ë' ˛                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                QPSÕ±”‡ã»¥Ë4 r+[X
+‰u¥HÕ!r;¡sé¿¥IÕ!˘Îé√¥IÕ!¯úP2‰Ë XùÎÉƒ˘Y√SQP˘∏RDÕ!r∫ X
+‰tB∏WDÕ!Î8¥0Õ!Y<|.<
+t*ª ±Ä
+Ìuª  ± ∏XÕ!räŸ2ˇ∏XÕ!r
+ªˇˇ¥HÕ!¯Î˘Y[√ae ailorsdftmncpwASbguy;IMOk   	Aµb9";Eb†
+Aµb1\#¥V*-x:$fLW„(áÄ√{=-xÈª_RÏ6t£ëÚ™Çô<AF#’ô^™Çô<AF#«sdÅRˇ Illegal initialization error                                                                                                                                                                                            ˇ            ˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ˇ                                                                   ˆ    R        <                                                                                ˇˇ                 ë    ˇ                             ˇ                                      ˇ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           çL7 )Å   I Å #  Ñ    2 .  
+ B  Å !  á     - 5   ;  Å Å   É    ( <  4  	Å Å   ÅÉ   Å 
+# <  -  Å Å   ÅÉ  
+ Å 	 < & &   Å  É  
+ÅÅÉ  Ñ    6 -    Å Å Å  Ö  
+É  Ñ   
+ / 4    É  Å Å Ö   É  ÅÉ  Ñ    ( ;    Ñ   Å Å Ñ  É  É  É    ! B 
+   Å Å Å Å Ñ  ÅÉ  É  Å
+Ñ  Å     BÅ    Å Ñ  Å Ñ  É  Ö  
+É  Å &   @   Ñ  Å É  Å Ñ  ÅÉ  ÅÉ  
+ÅÑ   )   9   Å Å Å É  Å Ñ  É  É  É   )   2 Å   Å Å Å  Å Ñ  É  ÅÉ  Ñ   ) ! + Å 	  Å Å Å	Å  Å É  ÅÉ  É  É  	 " ( $ Å   Å Å Å  Å Ñ  ÅÉ  	É  É    'D  Å	Å Å Å	Å  Å É  ÅÉ  É  	ÅÜ    ,Å AÇ   Å Å Å  Å É  ÅÉ  É  	ÅÖ    1Å AÅ  ÅÅ Å Å  Å Ñ  É  É  ÅÖ    6Å AÅ Å ÅÅÅ Å Å Å É   É  Åà    ÅÅÖ   ;Å AÅ Å 
+Å Å Å Å É   Å É  Åá     É  =Å AÅ Å ÅÅÅÅ  Å Å à    Å 
+Ñ  ÅÅÖ   Å
+ Ç  ;Å AÅ Å Å Å Å Å Å  Å 
+É  ÅÑ  
+  Å 9Å AÅ Å Å
+ÅÅ  Å Ñ    	Å É  ÅÇ  
+ 	 6 AÅ Å Å  Å Å Å Å É   
+
+  Å / Ç AÅ Å Å
+Å	Å É  Å Å  Å Ñ  
+ 
+ 
+ Ç  ( Å AÅ Å Å É  Å Å
+ Å Å Ö  
+ 
+ 
+ Ç ! ! Å 
+- 
+Å Å   Å É  Å  Å Å Ç  
+ 
+ Ç #  Å 
+Å +Å 
+Å Å  	 ä   É  Å Å Å Å Å 
+ 
+ $Ç %  Å 
++ Ç 
+ Ö   	 Ç Å É  Å   Å  
+ .Ç '  Å 
+Å )É  
+Å Ñ   	 Ç Å Ñ  Å Å  Ç Å 
+ 8Ç )  Å 
+Å )É  
+à    	 Å É  Å Å  Ç   BÇ + $Å 
+Å )É  
+Å  	Ü   É  Å Å Ñ   Å 8 Ç +Å (Å 
+Å )É  
+Å Å 	 Å É  Å ÅÅ  Å É  Å .
+ Å Å Ç +Å (Å 
+Å )É  
+Ü   	Ö   Ñ  Å Å  Å Ñ  Å $
+ Å Å Å Ç +Å (Å 
+Å )É  
+Å Å 	Ö   Ñ  Å ÅÅ Å Å Å Å Å 
+ Å Å Å Å Å Ç +Å (Å 
+Å )É  
+Å Å 	Ñ   É  Å Å  Å Å Å Å 
+ Å Å Å Å Å Å Å Ç +Å (Å 
+Å )É  
+Ñ  	Ñ   É  Å Å  Å Å Å Å  Ç Å Å Å Å Å Å Å Å Ç +Å (Å 
+Å )É  
+Ñ   	Ç É  Å Å Å Å Å Å Å Å Å Å Å Å Å Å Å Å Å Å Ç +Å (Å 
+Å ' Ç 
+  	Ç  Å Å Å Å  Å Å Å Å Å Å Å Å Å Å Å Å Å Ç +Å (Å 
+Å  Å  
+Ñ  	É  Å Å Å Å  É  Å Å Å Å Å Å Å Å Å Å Å Å Å Ç +Å Å Å 
+Å Ñ  Å  
+Ñ  	á   Ü    Å  Ñ  Å Å Å Å Å Å Å É  Å Å Å Å Å Ç +Å Ñ   Å 
+Å Å Å Å  
+Å Å 	 	É    à     Å Å Å Å Å Å Å Å É  Å Å Å Å  Ç +Å Å Å Å 
+Å Å Ñ   
+Å Å 	É  	Å 	É  Å  Å É   Å Å Å Å Å Å Å Å É  Å Å Å Å  Ç +Å Å  Å 
+Å Å É  Ü   Å Å 	 Å 	 	É  Å 
+É   Ñ Å Å Å Å Å Å Å Å Å Å Å Å Å  Ç +Å Å 	Å Å 
+Å Å É  Ç  Ç Å Å 	 Å 	 	É  Ç   Ç Å Å Å Ñ  Å Å Å Å Å Å Å Å  Ç +Å Å  
+Å 
+Å Å É   Ç Å Å Å 	 Å 	Ñ  	Ñ   Å   Ñ Å Å Å Ñ  Å Å Å Å Å Å Å Å É  Ç +Å Å Å 	Å 
+Å  Ü    Å Å Å 	Å Å 	É  	É  ê        Å Å Å Å Ö   Å Å Å Ñ  Å Å Å Ñ  Ç +Å Å  Å 
+Å Å   Å É 		 Å 	Å  	É  É   Å Å Å Å Å Å Å Å Å Å Å Å Å Å Ñ  Ç +Å Å Å Å 
+Å Å Å Ñ  Å Ü 	 		 Ñ 		 Å 		É  Ü    Ç Å Å Å Å Å Å Å Å Å Å Å Å Å Å Å Ç +Å Å  Å 
+Å  Å 
+ Å Å Å 	Å É 	 É  	É  Ñ  Ñ   ÅÅ Å Å Å Å Å Å Å Å Å Å Å Å Å Å Ç +Å Å  Å Å 
+Å  	Å Ö   á 	   Å Ñ 		   	É  Å Å Ñ  Å Å Å Å Å Ñ  Å Å 
+Å Å Å Å Å Å Ç +Å 
+Å 	 Å Å 
+Å Å 	Å Å Å 	Ñ  Å Ñ 		  É 	 	É  Å Å Å Å ÅÅ Å Å Å Å Ñ  Å Å ÅÅ Ñ  Å Å Å Ç +Å 	Å  Å Å 
+Å Å 	Å Å Å 	Ñ  Å Ñ 		 Å Å 	É  Å Å Å Ñ Å Å Å Å Å Ñ  Å Å Å 
+Ñ  Å Å Ç +Å   Å Å 
+Å Å 		Å Å Å 	É  Å Ñ 		 Å 	É  Å Å Å Ç Å Å Å Å Å Å Å Å Å ÅÅ 	Å Å Ñ  Ç +Å Å  
+Ñ  Å 
+Å Å 
+	Å Å 	É  Å Ñ 		 Å 	É   Å  Ö Å Å Å Å Ñ  Ñ  Å Å Å Å Ñ  Ç +Å Å  
+
+Ñ  Å 
+Å Å 	Å 
+Å 	É  Å Å 	Ñ  Å 	É   Ç  Ç Å Å Å Å É  Ñ  Å Å Å Å Å Å Ç +Å É  
+Ñ  Å 
+Å Å 	 Å 	É  Å Å 	Ñ  
+ Å 	Ñ   Ç 
+ ÅÅ Å Å Å É  Å Å Å Å Å Å Å Ç +Å Ñ  
+
+Ñ  Å 
+Å Å 	Å Å 	É  Å Å 	Å Å Å  Å 	 É  É  á   Å Å Å Å É  Ñ  Å Å Å Å Å Ç +Å Ñ  
+	
+Ñ  Å  Å  	Å Å 	É  Å Å 	Ñ  Å Å Å 
+	É   Ü   ÅÅ Å Å Å É  Å á  ÅÅ Å Å Å Ç +Å Ñ  
+	
+Ñ  Å  Ñ  Å 	  	Ñ  Å Å 	Ñ  Ñ  Å 
+	Ñ      Å Å Å Å Å Ñ  â   Å Å Å Ç +Å Ñ  
+Å		Å
+Ñ  Ñ  É  Å 	Ñ  É  	Ñ  Å Å 	â     Å 
+	Ñ  
+   
+Å Å Å Å Ñ  Å Å ÅÅÅÅ 
+Å Å Ç +Å Ñ  
+ã	 	 	
+Ñ  Ñ  É  
+Å 	Å  	É  Å Å 	Ç   Å 	Ñ    Ñ  Å 
+Å Å Å Å Ñ  Å Å Å Å Ç +Å Ñ  
+ã		
+Ñ  Ñ  É  	Å 	Å Å 	Ñ  Ñ  	 Ö  	Ñ    Å Å Å Å Å Å Å Å Å Å  Å	Å Å Ç +Å Ñ  
+É	É	
+Ñ  Ñ   Ñ 		 	Å Å 	Ñ  Ñ  	 â     	É     Å ÅÅ Å Å Å Å 
+Å  Ç  Ç  Ç +Å Ñ  
+ã	  	
+Ñ  Å Å  Å 	 	 	Å Å 	Ñ  Ñ  	 	 Å Ü  		 	É   Å Å Å Å Å Å Å 
+â    Å	 É    Ç +Å Ñ  
+ä		
+Ñ  	  Å 	Å Å 		 Å 	Ñ  Å   ä    	   	Å É  Å Å Å ÅÅ Å Å Å Å 
+ É  á     Ç +Å Ñ  
+ÅÅ
+á   	Å Ñ  	Å Å 	Å  Ç	 Å 	Ñ  Å á       		  Å Å Å Å Å Å Å  Å Ç Å  É   Ç +Å Ñ  
+
+Ü   Å Ñ  	 Å 	Å  Å 	Ñ  Å Å Å  Å Å 	Ñ   Å Å Å Å Å Å Å  à     
+ Ç +Å Ü  
+
+ 
+Ü   Å É  	Å Ñ 		  Ç	 Å 	Ñ  Å Å Å Å  	É  Å Å Å 
+ÅÅ Å Å  Å  Ñ   Å Ç +Å á  
+
+ Ç
+
+á   Å  	Å É 	 Å 	Å 	á 		  Ñ  Å Å 	 	É  Å  
+Å Å Å   Å Ñ   Å Ç +Å Ñ  
+
+Ñ   Å Å  	Å Å Å 	Å 	á 		  Ü   Å Å Å 	 É  ÅÅ Å Å  ' 
+Å Ç +Å Ñ  
+ÅÉ
+Ñ   Å É  	Å Å Ñ 		 
+Å 	É  Ö   Å 
+Å  	Ü     Å Å Å   Ö   Ö   Å Ç +Å Ñ  
+Å
+Ñ  Ñ  Å Ñ  	Å Å Ñ 		 
+Å 	É   Ç  Ç  
+ 	Ç  Å ÅÅ Å Å   Å Å Å Ç +Å Ñ  
+ÅÉ
+Ñ  Ñ   Å Ñ  	Å Ñ 		 
+Å 	É   	 Ü    á 		   Å Å Å Å Å Ö   	â   Å Ç +Å Ñ  
+Å
+Ñ   Å 
+Å 	Å  
+Ñ 		 
+Å 	É  É    É  Å ÅÅ Å Å Å Ö   ÅÜ   Å Ç +Å Ñ  
+Å
+
+Ñ   Å 	Ü    Ñ 		 
+Å 	É    Å Å  Å Å Å Å Å  Ç Ö   Å Ç +Å Ñ  
+Å
+
+Ñ  Å Å Å 	Ö   Å Å 	Å 
+Å 	Ü    Å Å 	Å Å Å Å Å Å Å  Å Ö   Å Ç +Å É  Å Å  É  Å 	Ü   Å Å 	Å 
+Å 	Ö   Å Å Å  Å Å Å Å Å Ñ   Å ÅÖ   Å Ç +Å Å Å Å Ö   Å Å 	 Ñ  	Å 
+Å 	Ñ  	Ñ     
+É  Å Å Å Å Å Ñ  á     Å Å 	Å Ç +Å Å Å Å  Ç É  Å Ç 	 	 à    	Å 
+Å 	Ñ    Å É     Å  Å Å Å Å Å Å Å  Ç  Å Å 
+Å Ç +Å   Ü    Ü   	Å 
+Å 	Ñ      Å  É   Ç É  Å Å Å Å Å Å Ö   Å Å Å Å Ç +Å (Å Ñ  Å  Ñ  	 
+Å 	Ö    Ç  Ö  Ñ   
+É   Å Å Ñ  Å Å   Å Å Å Å Ç +Å (Å Ñ  Å 	 Å 	Ñ  
+â 		    Ö   Ñ  Å 	Å  É  Å Å Å Ñ  Å  Å 	Å Å Å Å Å Ç +Å (Å Ñ  
+Å  
+ Ç 
+à 	    É   Å 
+Å Ç   Å Å Å Ñ  Å Å Å Å É  Å Å Å Ç +Å (Å  Å Å É    
+á 	    Å  
+Å Å  Å Å Å Å Ñ  Å Å  Ç  Å Å Å Å Ç +Å (Å   
+ 	 	Ñ  Å Å Å Ñ  	Å Å  Å Å Å Å Å Ñ  Å Å Å Å É  Å Ç +Å (Å Å Å Ñ  
+Å  á    É   Å 	Å Å 
+Å Å Å Å Å Å Å Å Å Å Å É  Å Ç +Å (ä    Å Å Å Å   Å Å Ñ   Ö  	Å Å 
+Å Å Å Å Å Å Å Å Å Å Å Ñ  Å Ç +Å (Ö   Ç Å Å   Ç 	 Å Å É  Ñ  Å  	Å Å Å Å Å Å Å Å Å Å Å Ñ  Å Ç +Å (ä    Å  Å Å 	 Å Å É   Å Å  	Å Å Å Å Ñ  Å Å Å Å Å Ñ  Å Ç +Å (Å Å Å Å $ Å 	á   É  Å Å  	Å Å Å Å Ñ  Å Å Å Å Å Å Å Å Ç  (Å  Å ' Ç 	á   É   	Å É  Å Å Å Å Ñ  Å Å Å Å Å Å Å Å Ç  		 	Å 'Å Å ) 	Ö    É   Ç 	Å  Å Å Å Å Ñ  Å Å Å Å Å Å Å Å Ç  		 	 &Å Å *Å 	Ü    Å 	Å  Å Å Å Å Ñ  Å Å Å Å Å Å Å Å Ç  		 	 	Å %Å 
+ ,Å 	 Å Å Ñ  Å 	Å É  Å Å Å Å Ñ  Å Å  Å Å Å Å Å Ç  		 	 	Å $Å 
+Ö   Ö   É 	 Å Å  Å Å É  Å Å Å Å Å Ñ  Å Ç 
+ Å Å Å Å Å Ç  		 	 
+	Å $Å 
+Ñ   	  Å Å Å Å É  Å Å Å Å Å Å Å Å Å 
+ Ñ  Å Å Å Ç  		 	 	Å $Å 
+Ñ   
+  Å Å Å Å  Ç Å Å Å Å Å Å Å Å Å   Å Å Å Å Ç 	 		 	 	 %Å 
+Ö      Å Å Å   Å Å Å Å Å Å Å Å Å 
+ Ñ  Å Å Å Ç  		 	 	 Ç	 %Å 
+Å Å  #	 Å Å Å  Å Å Å Å Å Ñ  Å    Å Å Å Å Å Ç  		 	 	 	Å %Å 
+Å Å 
+É  Å *Å Å Å Ñ   Å Å Å Å Å Å Å Å Ç 
+ Å Å Å Å Å Ç  		 	 	 	Å %Å 
+Å Å 
+ * Å Ü    Å Å Å Å Å Å Å Å Å 
+
+ Å Å Å Å Å Ç 		 	 	 
+	Å %Å 
+Å Å : Å â    Ö   Å Å Å Å Å Å Å Å  Å Å Å Å Ç 	 	 	 	Å %Å 
+Å Å < Å â     Ñ  Å Å Å Å Å Å Å Å Å Å Å Å Å Ç  	 	 	Å %Å 
+Å Å Å / Å 	 Ö   Ñ  Å Å  Å Å Å Å Å Å Å Å Å Ç 	 	 	Å %Å 
+Å Å 
+  + Å Å  Ñ  á    Å Å Å Å Å Å Å Å Å Å Å Å Ç 	Å 	 	Å %Å 
+Å Å  Å  ' Ç Å  Ç  É  Å Å Å Å Å Å Å Å Å Ñ  Å Ç 	 		 	Å %Å 
+Å   Å    Å Ü    á     Å Å Å Å Å Å  Å Å Ñ  Å Ç 	Å 	 	 $Å 
+Å 
+ Å     Å  Å á    Å Å  Å Å Å 
+
+ Ç Å Ñ  Å Ç 	Å 	 	 	 Å 
+Å     Å Å É   Ñ  Å Å  Ç Å Å  Å Å Å Å Ç 	 	Å 
+	 Å 
+Å Å  Å	 Å Å Ö   Ü   Å Å  Å Å Å Ñ  Å Ç 	  	Å 	 Å 
+Å Å Ñ  Å Å Å  Ñ  â    Å Å $ Å á    Å	 "	 	 Å 
+Å Å Å  Å Å Å à     Å Ñ  Å Å =Å á   Å  #	Å 	 	 Å 
+Å Å Å Ñ  Å Å Å  Ö  Å Ñ  Å Å =Å á   Å 	Å $	Å 		 	Å 	 
+Å 
+Å Å Å Å Å Å Å ä     à    Å Å =Å Ñ  Å Å 	Å $	Å 	 	Å 	Å 
+Å 
+Å Å  Å Å Å Å ä     Ö   Å Å Å =Å Å Å Å Å 	Å $	Å 	 	Å 
+Å 
+Å Å  Å Å Å â     Ü    Å Å Å =Å Å Å Å Å 	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å Å Å à    Ü     Å Å > Å Å Å 	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å Å Å   Å Å D Ç Å 	Å $	Å 	Å 	Å 
+Å 
+Å  Å Å Å  Å   Å Å J 	Å $	Å 	Å 	Å 
+Å 
+Å Å Ü   Å Å Å   
+ Å X	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å  Å É  Å    Ç Å X	Å $	 	Å 	Å 
+Å 
+Å  Ñ  Å É   É  É   Å Å X	Å "	 	 	Å 	Å 
+Å 
+Å Å  É  Å Å  É  Ö   á    Å  à    Å X	Å  	 		 	Å 	Å 
+Å 
+Å Å Å  Å É  Å ï           â     Å Å X	Å 	 	 
+	Å 	 
+Å 
+Å Å Å Å á    Å á    Ñ   Ç å        Å Å X	Å 	 	 	Ü 	  	 
+Å 
+Å Å Å Å  ä    Å ï          Ü   Å Å &Ñ.	Å 	 	 	Å 
+Å 
+Å Å Å Å à    
+Å â     á     Å Å %É0	Ç 	 	 #	 	Å 
+Å 
+Å Å 
+Å Å á     Å Å Å Å Å $,	 	 	 #	 	Å 
+Å 
+Å Å 	Å Å í         Å Å Å Å Å Å #
+Å *	Å 	 	 #	 		Å 
+Å 
+Å Å Å 
+Å Å ë       Å Å Ö   Å Å Å Å "Å )	 	 "	 	Å 
+Å 
+Å Å É  	Å Ç  Å  É  Å Å  Ü   Å Å Å Å "Å Å (		 	 	 	Å 
+Å 
+Å à    	Å â     Ñ  Å Å Å Ñ  Å Å Å Å !á   Å (	 	 	 	Å 
+Å 
+Å   Å 	 É  É  Ñ  Å Å Å Å Å Å ! Ö   Å '	 		Å 	Å 	 	Å 
+Å 
+Å !Ñ   
+ Å Å  Ü    Ö   É  Å Å Å !Å '	 	Å 	Å 	 	Å 
+Å 
+Å "Å Å  É    	Ü    â    à    Å Å Å !Å (	 	Å 	 	Å 
+Å 
+Å # Å    	 Å è        É  Å Å Å  Å (	Å 	Å 	 	Å 
+Å 
+Å %É    É  Ñ  å      à    Å Å Å  Å )	Å 	Å 	 	Å 
+Å 
+Å &   Ç Å  á    â     Å Å ! )	Å 	Å 
+	 	Å 
+Å 
+Å 'Å  Ñ  Å É  Ñ   Å Å "	  % 	Å 	Å 	 	 
+Å 
+Å &Å 	  Å É   Å Å &  Ñ  	 	Å 	Å 	 	 Ç	 
+Å 
+Å &Å   Ç Å   Å Å %Å 
+Å Ü    	 	Å 	Å 	 	 	Å 
+Å 
+Å % 
+  Ç Å  Å Å Å Å $Å Å â     	 	Å 	Ö 		  	 	Å 
+Å 
+Å $Å   Ñ  Å Å Å Å Å Å $Å Å à    	 
+	Å 	 	 	 	Å 
+Å #Å   É  Å Å Å Å Å Å $Å  	Å Å 	 	Ö 		  	 		Ç  Å 
+Å #Å Å 	 É  Å Å Å Ç  Å Å #É  	 Ñ  	 	 	 	Å  
+%   Ü   Å Å Å  
+ Å Å "Ç    	 	 	Å 
+Å 
+Å $Å Ö    É  Å Å Å Å 
+
+ Å Å "  Ö  	Å 	 	Å 
+Å 
+& Ö    Ç Å Å  Å 
+ 	Å Å $ Ñ    	Å 	 	Å 
+Å 0É  Å  Å Å Å Å  
+Å Å 
+ Å Å & Ö+	Å 	 	 
+Å 1Ñ    Ç Å Å Å  
+Å Å 
+ Å ( *	Å 	 	 Å 
+Å 5 Å Å Å Å Å 
+Å Å 
+Å Å *  (	Å 	 	 Ö  
+Å 7Ç  Å Å Å Å 
+Å Å 
+Å Å ,  &	Å 	 	 Ñ  
+Å 6É  Å Å Å  Å 
+Å Å 
+Å Å ,à     $ 	Å 	 	  É  
+Å 7Å Å Å Å 
+ 
+Å Å 
+Å Å 
+Å Å ,É   "	 	Å 	 	  Å 7 Å Å  
+Å Å 
+Å Å 
+Å Å ,å       	 	Å 
+	 	 Å AÅ Å  
+
+Å Å 
+ Å 
+Å Å ,Ñ    
+	 	Å 	 	 Å AÅ Ç  
+Å Å 
+Ñ   Å 
+Å Å ,Ñ   Å 	 	Å 	 	 Å AÅ  
+Å Å 
+ Å 
+Å Å ,Ñ   	 	Å 	 	 C   
+
+Å Å 
+Ñ  Å 
+Å Å ,Ñ  (	 	Ö 		  	 a  
+Å   
+Å Å ,Ñ  (	 	 h  Å
+ 	Å 	Å 
+Å Å ,Ñ  (	Å 	 o  Å Å 
+Å Å ,Ñ  (	Å 	 t Ç  Å Å 
+Å Å ,Ñ  ( 	Å 	 t 
+Ñ  Å  
+Å Å ,Ñ  ( 	Å 	 uÅ  Å É  
+Å Å ,Ñ  ( 	Å 		 vÑ  Å Å  Å 
+Å Å ,Ñ  (
+ 	Å 	 wÅ Å Å Å Å 	Ñ   
+Å Å ,Ñ  ( 	Å 	 )Å NÅ Å Å Å Å 	 Å  
+Å Å ,Ñ  ( 	Å 	 ) Å JÅ Å Å Å Å Å Å 
+ 
+Å Å ,Ñ  ( 	Ç 	 )Å  Å DÅ Å Å Å Å Å   
+Å Å ,Ñ  ( Å (Å Å  Å ?Å Å Å Å Å Å Å   Å ,Ñ  (Å Å Å & Ç Å  Å ;Ñ  Å Ñ  Å Å 
+ 	Å Å ,Ñ  (Å Å Å %  Ç Å  Å 6Ñ  Å Ñ  Å   Å Å ,Ñ  ( Ö   $  Ç Å  Å 1Ñ  Å Ñ  Å   Å ,Ñ  ( $  Ç Å  Å -É   Ñ  Å   Ç ,Ñ  (A  Ç Å  Å )  É   É  & )Ñ  (?   Ç Å  Å '    / $Ñ  (= 	  Ç Å  Å 4Å Å 6 Ñ  (; 	   Ç Å  Å 0 < Ñ  (9 	   Ç Å  Å p Ñ  (7 	   Ç Å  Å p Ñ  (5 	   Ç Å  Å p Ñ  (3 	 "  Ç Å  Å p Ñ  (1 	 )  Ç Å  Å p Ö  (/ 	 0  Ç Å  Å lÅ  Å (- 	 7  Ç Å  Å fÉ  É  #+ 	 >  Ç Å  Å `Å å      ) 	 E  Ç Å  Å \Å á    Å  ' 	 L  Ç Å  Å XÅ  Å Å  % 	 S  Ç Å  Å TÅ á    # 	 Z  Ç Å  Å Pâ     
+! 	 a  Ç Å  Å Lá      	 h  Ç Å  Å HÅ Å #  	 o  Ç Å  Å BÅ Å B 	 v  Ç Å  Å <Å Å Å ? 	 }  Ç Å  Å 6Å É  Å < 	   Ç Å  Å 1Å Å Å Å 9 
+Å   Ç Å  Å ,Å Å Å Å #N x  PANGELO.EXE    l£ùp(  OˇˇˇNEWDRAW5.EXE  ∂∂ù∞g  /   NEWDRAW6.EXE  S°ùPl  ˛ˇˇTESTING.EXE   Rµù†  }˛ˇˇ¥k J 	I Å	ÅH Å	ÅH 		H 		ÅG 		ÅG 		ÅG 	Å	G 	Ç 	G 	 Å	G 	 Å	ÅE Å	 Å	ÅE Å	 	E Å	 Å	E 	 Å	E 	 	E 	 Å	E 	 Å	E 	 	E 	 	E 	 	ÅC Å	 	ÅC Å	 	Å! Å  Å	Å 	Å! Ç Å	Å Å	Å!  Å	Å Å	Å!  Å	Å Å	Å!  Å	Å Å	Å!  Å	Å Å	Å!  Å	Å Å	Å!  Å Å	Å Å	Å!  Å Å Ç( Å	Å Å	Å   Å( (Å Å	Å Å	Å Å
+ K  (Å (Å Å	Å Å	Å Å
+Ç  KÇ KÅ (Ç (Å Å	Å Å	Å Å
+Ñ  KÅK Å(Ç (Å Å	Å Å	Å 
+Ç  Å  KÅK Å(Å ( Å	Å Å	Å Å Å
+Ç  Ñ ` K (Å ( Å	Å Å	Å Å É Å
+Ç  Ñ ` KÅ (Å( Å	Å Å	 Å Å 
+Ñ  Ñ ` KÅK ( Å	Å Å	 É Å 
+Ñ  Ç ` KK (( Å	Å 	 ÇÅ 
+Ñ  Ç ` KÉ K Å(Ç ( Å	Å 	 Ç 
+Ç  Å ` K K Å(Å ( Å	Å 	 Ç Ç
+
+Ç  Å ` KÅ ÅK Å(Å Å( Å	Å 	 ÉÅ É
+ 
+Ç  Å ` KÅ ÅK Å( ( Å	Å 	Å Å Å
+ 
+Å Å ` KÅ K ( ( Å	Å 	Å Å Å
+ 
+Å Å ` K KÇ ( Å( Å	Å 	Å ÅÅ Å É
+ Ü  ` K KÇ (Å Å( Å	Å 	Å ÅÇ Ç É
+Å Ö  ` K KÇ ( ( 	 	Å Å É Ç
+Ü   ` K KÇ ( ( 	 	 ÅÅ Ç Ç
+É Å ` K KÅ ( ( 	 	 Å Ç Ç
+Ç ` K KÅ ( ( 	 	 Å Å 
+Ç ` K KÅ ( ( 	 	 É 
+Ç `Å K ÅKÅ ( ( 	 Å	 É 
+ Ç `Å K KÅ ( ( 	 Å	 É 
+ É `Å K KÅ ( ( 	 Å	 É 
+ É `Å K KÅ ( ( 	 	 É 
+ É `Å K KÅ ( ( 	 	 É 
+ Å `Å K KÅ ( ( 	 	 É 
+ Å `Å K KÅ ( ( 	 Å	 É
+ 
+ ÅÅ `Å K KÅ ( ( 	 Å	 É
+ 
+ ÖÅ `Å K KÅ ( ( 	 Å	 É
+ 
+ ÑÅ `Å K KÅ (Å ( 	 Å	Å Ç
+ Å
+Å ÑÅ `Å K KÅ (Å ( 	 Å	Å Ç
+ Å
+Å Ñ `Å K KÇ ( (Å 	 	Å Ç
+ 
+
+Å Ñ  `Å K KÇ ( Ö(( 	 	 Ç
+ 
+Å É
+ Ñ  `Å K KÇ ( (É( 	 	 Ç
+ Ç
+ É
+ Ñ  ` K KÇ (Å (É( 	 Å	 Ç
+ Ç
+ É
+ Ñ  ` K K ( Å(É( 	 Å	Å 
+ Å
+ É
+ Å  ` K K ( (Å( 	 	 
+ Å
+ É
+ Å  ` K K Å(Ç (Å( 	 Å	 
+ Å
+ É
+ Å  ` K K Å(Å(Å( Å	Ç 	 
+ Å
+ É
+ É  ` K K (Å(Å( Å	Å	Å 
+ Ç
+ Å
+ É  ` K K (Å( Å	 
+ Ç
+ Å
+ É  ` K K (Å( 	 
+ 
+ Å
+ É  ` K K Å(( 	Å 
+ 
+ 
+Ç Ñ  Ç` K K Å(( 	 
+ 
+É 
+Å Ç  Ç` K K (Ç ( 	 Ç
+ Å
+Å
+Å É  Å K K Å(Ç ( 	 Ç 
+Å É  Å K K (Ç ( Å	Å  
+Ö
+  Å	  K (É ( 	Å	 Å 
+É 
+  Å ÇK É( Å( Å	Å
+ Å Å
+É    Å(	  Å
+Å& Å(# É
+' Å($ Å( (N (N (ÅN (ÅN (ÅN (ÅN (ÅN (ÅN (ÅM Å(ÅM Å(N Å(N Å(G Å Å(G Å( (G Å( (F Ç( (F É( (ÅF ( Å(G ( (G (Å Å(! (# ((! Ç(Y Å( Å(Å! Ç(Y (Å (É (@(Å ( Å(" Ç(Y (Å gÅ @Å(@ (" Ç(Y YÅ gÅ @ (Å" Ç(Y YÅ gÇ( @ Å(Å# Ç(Y YÖ (g( @ (Å# Ç(Y Å(Y Ég( @Å( (Å$ Ñ(Y( Y Ég( (@( % Ñ(Y( Y Çg( É(@(? Ñ(Y( YÅ( Çg( Ç@(? Ñ(Y( Y Çg( Ç@(? Ç(Y(Y Çg( Ç@(? Ç(Y(ÇY( Çg( Ç@(? É(Y(YÅ( Çg( Ç@(? É(Y(Y Çg( Ç@(? É(Y(Y Çg( Ç@(A ÇY(Y g Ç@(A Y g Ç@(A Y g Ç@(A Y g Ç@(A Y g Ç@(A Y Ç(g Ç@(A YÅ( Ç(g Ç@(A YÅ( g Ç@(A YÅ( Ç(g Å@B YÅ(Y Ç(g Å@B YÅ(Y g Å@B YÅ Y g Å@B YÅ Y g Å@B YÉ (Y g Å@B YÉ (Y g Å@B Y ÇY( g Å@B Y ÑY( (gÅ( Å@B Y (Å g Å(B ÇY( g Å(B ( gM gÇ(gM (Ç ( Å Å Å Å: É  Å  Å0  Ç  à     Å É  Å Å Å  Ç É  Ç  Å Ç   Ü    É  Å  Å $ Å
+ Ü    É  Ç  Å É -    Ç Ç  É $ Å
+ Å Ö   ! Å
+ Å Å Å - Å  Å. Å  Å^ Å Å+  Å	  Å* Å Å Å  1 Å Å É 	 Å	 ( Å Ç  É 
+ Å
+  Å Å Å É  Å  Å1 Å Å 	 Å, Å Å Å  Å Å  Å Å   Å Å  Å Å Å Å  Å Å Å Å
+ Å Å   É 	 Å Å Å Å Å Å Å É 	 Å Å Å( Å Å Å Å Å Å Å Å É  Å Å É  Å
+ á    É  É  Å	 Å Å Å
+ Ç  Å Å Å Å  Å	 Å  Å Å Å É  Å É   Å  Å Å Å Ñ   Å Å Å Å Å  Å Å Å Å Å  Å É   Ç  Å  Å Å  Å  Å Å Å Å Å É  Å  Å Å  6 Å: Å Å2  Å Å Åj Å4 Ål Å` ÅAˇ Aˇ Aˇ B	 uses crt,vgaliz;
+var
+  lx,ly                 :word;
+  ch                    :char;
+  xmic,ymic             :word;
+  l,r,m,closethis       :boolean;
+  posmeth,pmic,bmic     :byte;
+  minc                  :byte;
+  p1,p2,p3,pen,micpos   :pointer;
+  luh,ldh,llv,lrv       :pointer;
+  x1,x2,y1,y2           :word;
+  pt                    :array[0..15]of pointer;
+  f                     :string;
+  mydelay               :word;
+  speed,faster,slower   :word;
+  forposition           :pointer;
+  upper,onplot          :boolean;
+
+procedure beep;
+begin
+  sound(100);
+  delay(10);
+  nosound;
+end;
+
+procedure yeynot(x,y:word);
+begin
+  asm
+    push ds
+    mov  ax,0a000h
+    mov  es,ax
+    mov  ds,ax
+    mov  ax,320
+    mul  y
+    add  ax,x
+    mov  si,ax
+    mov  di,ax
+    lodsb
+    not  al
+    stosb
+    pop  ds
+  end;
+end;{yeyxor}
+
+procedure mygetdac(what:byte;var red,green,blue:byte);
+var
+  r,g,b:byte;
+begin
+  asm
+    pushf
+    cli
+    mov  dx,03c8h
+    mov  al,what
+    out  dx,al
+    inc  dx
+    in   al,dx
+    mov  r,al
+    in   al,dx
+    mov  g,al
+    in   al,dx
+    mov  b,al
+    popf
+  end;
+  red:=r;
+  green:=g;
+  blue:=b;
+end;
+
+procedure ellipsexor(x0,y0,a0,b0:integer);
+var
+  x,y :integer;
+  a,b,asq,asq2,bsq,bsq2,d,dx,dy:longint;
+begin
+  x := 0 ;
+  y := b0 ;
+  a := a0 ;
+  b := b0 ;
+  asq := a*a ;
+  asq2 := asq*2 ;
+  bsq := b*b ;
+  bsq2 := bsq*2 ;
+  d := bsq-(asq*b)+(asq shr 2) ;
+  dx := 0 ;
+  dy := asq2*b ;
+  while dx<dy do
+  begin
+    {if fill then}
+    yeynot(x0+x,y0+y) ;
+    yeynot(x0-x,y0+y) ;
+    yeynot(x0+x,y0-y) ;
+    yeynot(x0-x,y0-y) ;
+    if d>0 then
+    begin
+      dec(y) ;
+      dec(dy,asq2) ;
+      dec(d,dy) ;
+    end ;
+    inc(x) ;
+    inc(dx,bsq2) ;
+    inc(d,bsq+dx) ;
+  end;
+  inc(d,(3*(asq-bsq)DIV 2-(dx+dy))DIV 2) ;
+  while y>=0 do
+  begin
+    {IF fill THEN
+      HLine(x0-x,y0+y,x0+x,c);
+      HLine(x0-x,y0-y,x0+x,c);
+    ELSE}
+    yeynot(x0+x,y0+y) ;
+    yeynot(x0-x,y0+y) ;
+    yeynot(x0+x,y0-y) ;
+    yeynot(x0-x,y0-y) ;
+    if d<0 then
+    begin
+      inc(x) ;
+      inc(dx,bsq2) ;
+      inc(d,dx) ;
+    end;
+    dec(y) ;
+    dec(dy,asq2) ;
+    inc(d,asq-dy) ;
+  end ;
+end;{ellipsexor}
+
+procedure mix(p1,p2,r1,r2,g1,g2,b1,b2:byte);
+var
+  dp,rd,gd,bd:real;
+  dr,dg,db:integer;
+  p,r,g,b:byte;
+begin
+  r1:=r1 and 63;r2:=r2 and 63;g1:=g1 and 63;g2:=g2 and 63;b1:=b1 and 63;b2:=b2 and 63;
+  dp:=p2-p1;
+  if dp=0 then dp:=0.00000001;
+  dr:=r2-r1;
+  dg:=g2-g1;
+  db:=b2-b1;
+  rd:=dr/dp;
+  gd:=dg/dp;
+  bd:=db/dp;
+  for p:=0 to round(dp) do
+  begin
+    r:=r1+round(rd*p);
+    g:=g1+round(gd*p);
+    b:=b1+round(bd*p);
+    myup(p+p1,r,g,b);
+  end;
+end;{mix}
+
+procedure oval(x,y,x0,y0:integer;c:byte);
+begin
+  ellipse(x,y,round(abs(x0-x)*1.414213562),round(abs(y0-y)*1.414213562),c);
+end;{oval}
+
+procedure ovalxor(x,y,x0,y0:word);
+var
+  xx,yy:integer;
+begin
+  xx:=x0-x;
+  xx:=abs(xx);
+  xx:=round(xx*1.414213562);
+  yy:=y0-y;
+  yy:=abs(yy);
+  yy:=round(yy*1.414213562);
+  ellipsexor(x,y,xx,yy);
+end;{oval}
+
+procedure putpen;
+begin
+  if xmic<160 then
+  if ymic<100 then
+  begin
+    yeyan(xmic,ymic,15);
+    line(xmic+1,ymic+1,xmic+4,ymic+4,pmic);
+    line(xmic+1,ymic,xmic+6,ymic+5,14);
+    line(xmic,ymic+1,xmic+5,ymic+6,14);
+    line(xmic+4,ymic+5,xmic+5,ymic+4,12);
+    line(xmic+5,ymic+6,xmic+6,ymic+5,12);
+    yeyan(xmic+5,ymic+5,12);
+  end else
+  begin
+    yeyan(xmic,ymic,15);
+    line(xmic+1,ymic-1,xmic+4,ymic-4,pmic);
+    line(xmic+1,ymic,xmic+6,ymic-5,14);
+    line(xmic,ymic-1,xmic+5,ymic-6,14);
+    line(xmic+4,ymic-5,xmic+5,ymic-4,12);
+    line(xmic+5,ymic-6,xmic+6,ymic-5,12);
+    yeyan(xmic+5,ymic-5,12);
+  end else if ymic>100 then
+  begin
+    yeyan(xmic,ymic,15);
+    line(xmic-1,ymic-1,xmic-4,ymic-4,pmic);
+    line(xmic-1,ymic,xmic-6,ymic-5,14);
+    line(xmic,ymic-1,xmic-5,ymic-6,14);
+    line(xmic-4,ymic-5,xmic-5,ymic-4,12);
+    line(xmic-5,ymic-6,xmic-6,ymic-5,12);
+    yeyan(xmic-5,ymic-5,12);
+  end else
+  begin
+    yeyan(xmic,ymic,15);
+    line(xmic-1,ymic+1,xmic-4,ymic+4,pmic);
+    line(xmic-1,ymic,xmic-6,ymic+5,14);
+    line(xmic,ymic+1,xmic-5,ymic+6,14);
+    line(xmic-4,ymic+5,xmic-5,ymic+4,12);
+    line(xmic-5,ymic+6,xmic-6,ymic+5,12);
+    yeyan(xmic-5,ymic+5,12);
+  end;
+end;{putpen}
+
+procedure giveme;
+var
+  bot:byte;
+begin
+  asm
+    mov  ax,3
+    int  33h
+    mov  bot,bl
+  end;
+  l:=bot and 1=1;
+  r:=bot and 2=2;
+  m:=bot and 4=4;
+end;
+
+procedure init;
+begin
+  asm
+    mov  ax,0fh
+    mov  cx,1
+    mov  dx,1
+    int  33h
+  end;
+end;
+
+procedure getcount;
+begin
+  asm
+    mov  ax,0bh
+    int  33h
+    add  xmic,cx
+    add  ymic,dx
+    cmp  xmic,319
+    jle  @a1
+    mov  xmic,319
+    jmp  @a2
+@a1:cmp  xmic,0
+    jge  @a2
+    mov  xmic,0
+@a2:cmp  ymic,199
+    jle  @a3
+    mov  ymic,199
+    jmp  @a4
+@a3:cmp  ymic,0
+    jge  @a4
+    mov  ymic,0
+@a4:
+  end;
+end;
+
+procedure clear;
+begin
+  asm
+    mov ax,0a000h
+    mov es,ax
+    mov di,0
+    mov cx,32000
+    mov al,bmic
+    mov ah,al
+    rep stosw
+  end;
+end;
+
+procedure showposition;
+var
+  a,c:byte;
+begin
+  case posmeth of
+    0,2:begin
+        c:=yeyun(xmic,ymic);
+        for a:=0 to 255 do
+        begin
+          inc(c);
+          yeyan(xmic,ymic,c);
+        end;
+      end;
+    1,2:begin
+        if xmic<160 then
+          if ymic<100 then getthis(xmic,ymic,xmic+6,ymic+6,pen^)
+          else getthis(xmic,ymic-6,xmic+6,ymic,pen^)
+        else if ymic>100 then getthis(xmic-6,ymic-6,xmic,ymic,pen^)
+          else getthis(xmic-6,ymic,xmic,ymic+6,pen^);
+        putpen;
+        delay(10);
+        if xmic<160 then
+          if ymic<100 then putthis(xmic,ymic,pen^,0)
+          else putthis(xmic,ymic-6,pen^,0)
+        else if ymic>100 then putthis(xmic-6,ymic-6,pen^,0)
+          else putthis(xmic-6,ymic,pen^,0);
+      end;
+  end;
+  if posmeth=2 then
+  begin
+    if ymic>100 then
+    begin
+      if not(upper) then
+      begin
+        putthis(0,192,forposition^,0);
+        getthis(0,0,319,7,forposition^);
+        upper:=true;
+      end;
+      gotoxy(1,1);
+      write('X:',xmic:4,' Y:',ymic:4,' C:',pmic:4);
+    end else
+    begin
+      if upper then
+      begin
+        putthis(0,0,forposition^,0);
+        getthis(0,192,319,199,forposition^);
+        upper:=false;
+      end;
+      gotoxy(1,25);
+      write('X:',xmic:4,' Y:',ymic:4,' C:',pmic:4);
+    end;
+  end;
+end;{showposition}
+
+procedure boxer;
+var a:byte;
+begin
+  getthis(x1,y1,xmic,y1,luh^);
+  getthis(x1,ymic,xmic,ymic,ldh^);
+  getthis(x1,y1,x1,ymic,llv^);
+  getthis(xmic,y1,xmic,ymic,lrv^);
+  repeat
+    if y1=ymic then line(x1,y1,xmic,ymic,a)else box(x1,y1,xmic,ymic,a);
+    inc(a);
+  until a=255;
+  putthis(x1,y1,luh^,0);
+  putthis(x1,ymic,ldh^,0);
+  putthis(x1,y1,llv^,0);
+  putthis(xmic,y1,lrv^,0);
+end;{boxer}
+
+procedure obeyoval;
+var
+  lx,ly:word;
+begin
+  repeat
+    giveme;
+    getcount;
+    showposition;
+    if l then
+    begin
+      lx:=xmic;
+      ly:=ymic;
+      repeat
+        giveme;
+        getcount;
+        showposition;
+        ovalxor(lx,ly,xmic,ymic);
+        ovalxor(lx,ly,xmic,ymic);
+        if m then oval(lx,ly,xmic,ymic,pmic);
+      until not(l)or m;
+    end;
+    if keypressed then ch:=readkey;
+  until(ch=#27)or(r or m);
+  while l or m or m do
+  begin
+    giveme;
+  end;
+  getcount;
+  lx:=xmic;ly:=ymic;
+end;{obeyoval}
+
+procedure obeyload;
+begin
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p1^);
+  putthis(0,0,p1^,0);
+end;{obeyload}
+
+procedure obeysave;
+begin
+  getthis(0,0,319,199,p1^);
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  asave(f,p1^,65535);
+  putthis(0,0,p1^,0);
+end;{obeysave}
+
+procedure zipperns;
+begin
+  compress(ptr($a000,0)^,p1^);
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  lizsave(f,p1^);
+  uncompress(p1^,ptr($a000,0)^);
+end;{zipperns}
+
+procedure unzipperns;
+begin
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p1^);
+  uncompress(p1^,ptr($a000,0)^);
+end;{zipperns}
+
+procedure unzipperns2;
+begin
+  gotoxy(1,1);write('filename ');
+  readln(f);
+  aload(f,p1^);
+  explode(p1^,ptr($a000,0)^);
+end;{zipperns}
+
+procedure obeycut;
+begin
+  repeat
+    giveme;
+    getcount;
+    showposition;
+    if l then
+    begin
+      x1:=xmic;
+      y1:=ymic;
+      repeat
+        giveme;
+        getcount;
+        if xmic<x1 then xmic:=x1;
+        if ymic<y1 then ymic:=y1;
+        boxer;
+        showposition;
+        if m then getthis(x1,y1,xmic,ymic,p2^);
+      until not(l)or m;
+    end;
+    if keypressed then ch:=readkey;
+  until(ch=#27)or(r or m);
+  while l or m or r do
+  begin
+    giveme;
+  end;
+  getcount;
+  lx:=xmic;ly:=ymic;
+end;{obeycut}
+
+procedure obeyput;
+var lx,ly:word;
+begin
+  getthis(0,0,319,199,p3^);
+  repeat
+    getcount;
+    giveme;
+    putthis(xmic,ymic,p2^,0);
+    if(lx<>xmic)or(ly<>ymic)then putthis(0,0,p3^,0);
+    lx:=xmic;ly:=ymic;
+    if l then putthis(xmic,ymic,p2^,0);
+  until (l or m);
+  lx:=xmic;
+  ly:=ymic;
+end;{obeyput}
+
+procedure makeforanimate;
+var x,y:word;
+begin
+  for x:=0 to 3 do
+  begin
+    line(0,x*50,319,x*50,255);
+    line(x*80,0,x*80,199,255);
+  end;
+end;{makeforanimate}
+
+procedure animate;
+var a:byte;
+begin
+
+{  for a:=0 to 15 do}
+{  getthis((a and 3)*80,(a shr 2)*50,(a and 3)*80+79,(a shr 2)*50+49,pt[a]^);}
+  repeat
+    for a:=0 to 3 do
+    begin
+{      delay(mydelay);}
+      retr;retr;retr;retr;
+      movebar(0,0,79,49,a*80,0);
+    end;
+    for a:=0 to 3 do
+    begin
+{      delay(mydelay);}
+      retr;retr;retr;retr;
+      movebar(0,0,79,49,a*80,50);
+    end;
+    for a:=3 downto 0 do
+    begin
+{      delay(mydelay);}
+      retr;retr;retr;retr;
+      movebar(0,0,79,49,a*80,50);
+    end;
+    for a:=3 downto 0 do
+    begin
+{      delay(mydelay);}
+      retr;retr;retr;retr;
+      movebar(0,0,79,49,a*80,0);
+    end;
+  until keypressed;
+end;{animate}
+
+procedure choosecolor;
+var
+  x,y,xx,yy:word;
+  red,grn,blu:byte;
+begin
+  getthis(0,0,319,199,p1^);
+  for y:=0 to 7 do for x:=0 to 31 do
+  begin
+    for yy:=0 to 6 do for xx:=0 to 6 do
+      yeyan(x*8+xx,y*8+yy,y*32+x);
+    for yy:=0 to 7 do
+      yeyan(x*8+7,y*8+yy,0);
+    for xx:=0 to 7 do
+      yeyan(x*8+xx,y*8+7,0);
+  end;
+  bar(264,0,319,63,0);
+  gotoxy(33,1);write('red');
+  gotoxy(33,3);write('green');
+  gotoxy(33,5);write('blue');
+  gotoxy(33,7);write('gray');
+  closethis:=false;
+  repeat
+    getcount;
+    giveme;
+    showposition;
+    if l then
+    begin
+      if(xmic<256)and(ymic<64)then
+      begin
+        pmic:=((ymic shr 3)shl 5)+(xmic shr 3);
+        mygetdac(pmic,red,grn,blu);
+        bar(256+red,8,319,15,0);
+        if red<>0 then bar(256,8,256+red,15,12);
+        bar(256+grn,24,319,31,0);
+        if grn<>0 then bar(256,24,256+grn,31,10);
+        bar(256+blu,40,319,47,0);
+        if blu<>0 then bar(256,40,256+blu,47,9);
+        bar(256+blu,56,319,63,0);
+        if (red and grn and blu)<>0 then bar(256,56,256+(red+grn+blu)div 3,63,15);
+        gotoxy(39,1);write(red:2);
+        gotoxy(39,3);write(grn:2);
+        gotoxy(39,5);write(blu:2);
+        gotoxy(38,7);write((red+grn+blu):3);
+      end else if(xmic<40)and(ymic>192)then closethis:=true;
+    end;
+    if m then
+    begin
+    end;
+    if keypressed then ch:=readkey;
+  until(ch=#27)or closethis;
+  while l do giveme;
+  putthis(0,0,p1^,0);
+end;{choosecolor}
+
+procedure lethimchoose;
+begin
+end;
+
+procedure checkright;
+begin
+  if posmeth=2 then
+    if ymic>100 then putthis(0,0,forposition^,0)else putthis(0,192,forposition^,0);
+  posmeth:=1;
+end;
+
+procedure obeycommand;
+begin
+  ch:=readkey;
+  if ch=#0 then
+  begin
+    ch:=readkey;
+    case ch of
+      #24:obeyoval;
+      #38:obeyload;
+      #31:obeysave;
+      #46:obeycut;
+      #25:obeyput;
+      #50:makeforanimate;
+      #30:animate;
+      #32:begin
+            getthis(0,0,319,20,p1^);
+            gotoxy(1,1);write('delays ');readln(mydelay);
+            putthis(0,0,p1^,0);
+          end;
+      else
+      begin
+        for faster:=0 to speed do
+        begin
+          case ch of
+            #72:if ymic>0 then dec(ymic)else beep;
+            #80:if ymic<199 then inc(ymic)else beep;
+            #75:if xmic>0 then dec(xmic)else beep;
+            #77:if xmic<319 then inc(xmic)else beep;
+            #71:begin if xmic>0 then dec(xmic)else beep;if ymic>0 then dec(ymic)else beep;end;
+            #81:begin if xmic<319 then inc(xmic)else beep;if ymic<199 then inc(ymic)else beep;end;
+            #73:begin if xmic<319 then inc(xmic)else beep;if ymic>0 then dec(ymic)else beep;end;
+            #79:begin if xmic>0 then dec(xmic)else beep;if ymic<199 then inc(ymic)else beep;end;
+            else checkright;
+          end;
+          if ch in[#72,#80,#75,#77,#71,#81,#73,#79]then if onplot then yeyan(xmic,ymic,pmic);
+        end;
+      end;
+    end;
+  end else
+  begin
+    if ch='z'then zipperns;
+    if ch='u'then unzipperns;
+    if ch='e'then unzipperns2;
+    if ch='*'then onplot:=not(onplot);
+    if ch='\'then
+    begin
+      inc(posmeth);
+      if posmeth>2 then posmeth:=0;
+      if posmeth=2 then
+      begin
+        if ymic>100 then
+        begin
+          getthis(0,0,319,7,forposition^);
+          upper:=true;
+        end else
+        begin
+          getthis(0,192,319,199,forposition^);
+          upper:=false;
+        end;
+      end;
+      if posmeth=0 then
+      begin
+        if ymic>100 then putthis(0,0,forposition^,0)else putthis(0,192,forposition^,0);
+      end;
+    end;
+  end;
+end;{obeycommand}
+
+procedure fetchmouse;
+begin
+  giveme;
+  if r then
+  begin
+    checkright;
+    minc:=0;
+    if l then filler(xmic,ymic,pmic);
+    if m then clear;
+    lx:=xmic;ly:=ymic;
+  end else
+  begin
+    if l then line(lx,ly,xmic,ymic,pmic);
+    if m then
+    begin
+      pmic:=yeyun(xmic,ymic);
+      inc(minc);
+      if minc>30 then begin checkright;choosecolor;minc:=0;end;
+    end else minc:=0;
+    lx:=xmic;
+    ly:=ymic;
+  end;
+end;{fetchmouse}
+
+procedure initialize;
+begin
+  asm
+    mov ax,0
+    int 33h
+  end;
+  posmeth:=1;
+  myup(255,63,63,63);
+  ch:=#0;
+  minc:=0;
+  getmem(p1,64002);
+  getmem(p2,64002);
+  getmem(p3,64002);
+  directvideo:=false;
+  getmem(pen,52);
+  getthis(xmic,ymic,xmic+6,ymic+6,pen^);
+  pmic:=1;
+  bmic:=0;
+  closethis:=false;
+  getmem(luh,322);
+  getmem(ldh,322);
+  getmem(llv,202);
+  getmem(lrv,202);
+{  for x1:=0 to 15 do
+  getmem(pt[x1],4002);}
+  x1:=0;x2:=319;y1:=0;y2:=199;
+  mydelay:=0;
+  speed:=0;
+  getmem(forposition,4096);
+  onplot:=false;
+end;{initialize}
+
+begin
+  vgamode(1);
+  initialize;
+  repeat
+    getcount;
+    fetchmouse;
+    if keypressed then
+    begin
+      obeycommand;
+      inc(speed);
+      if speed>10 then speed:=5;
+      slower:=0;
+    end else
+    begin
+      inc(slower);
+      if slower>10 then speed:=0;
+    end;
+    showposition;
+  until ch=#27;
+end.uses crt,vgaliza;
+var
+  on,off                    :byte;
+  ch                        :char;
+  a,b,c,d,a1,a2,a3,a4,loop  :word;
+  counter                   :word;
+  soundon                   :boolean;
+  mytime                    :word;
+  myvol                     :byte;
+  mydur                     :word;
+  pat                       :array[0..255]of byte;
+
+procedure tring(time:word;vol:byte;dur:word);
+var
+  loops:word;
+  tvol:byte;
+begin
+  if vol>time then vol:=time;
+  loops:=(4860 div time)*dur;
+  for loop:=0 to loops do
+  begin
+     tvol:=vol-vol*loop div loops;
+     for a:=0 to time-tvol do; port[$61]:=on;
+     for a:=0 to tvol  do; port[$61]:=off;
+  end;
+end;
+
+procedure tring2(time:word;vol:byte;dur:word);
+var
+  loops:word;
+  tvol:byte;
+begin
+  if vol>time then vol:=time;
+  loops:=(4860 div time)*dur;
+  for loop:=0 to loops do
+  begin
+     tvol:=vol-(pat[loop*255 div loops]*vol div 63)*loop div loops;
+     for a:=0 to time-tvol do; port[$61]:=on;
+     for a:=0 to tvol  do; port[$61]:=off;
+  end;
+end;
+
+procedure trings(time:word;dur:word);
+var
+  loops:word;
+  tvol:byte;
+begin
+  loops:=(4860 div time)*dur;
+  for loop:=0 to loops do
+  begin
+     tvol:=255*loop div loops;
+     for a:=0 to time-pat[tvol] do; port[$61]:=on;
+     for a:=0 to pat[tvol] do; port[$61]:=off;
+  end;
+end;
+
+procedure initialize;
+begin
+  on:=port[$61]or 2;
+  off:=port[$61]and not(3);
+  counter:=0;
+  soundon:=true;
+  mytime:=1000;
+  myvol:=13;
+  mydur:=100;
+
+  for a:=0 to 255 do
+    pat[a]:=63;
+end;{initialize}
+
+begin
+  initialize;
+  ch:=#0;
+  readkey;
+  repeat
+    if keypressed then
+    begin
+      ch:=readkey;
+      if ch='t' then tring(mytime,myvol,mydur);
+      if ch='1' then trings(mytime,mydur);
+      if ch='2' then tring2(mytime,myvol,mydur);
+      if ch='s' then soundon:=not(soundon);
+      if ch='+' then begin inc(myvol); if myvol>63 then myvol:=63; end;
+      if ch='-' then begin dec(myvol); if myvol=255 then myvol:=0; end;
+      if ch='.' then begin inc(mytime,10); end;
+      if ch=',' then begin dec(mytime,10); if mytime>60000 then mytime:=0; end;
+    end;
+    if soundon then tring(mytime,myvol,mydur);
+    inc(counter);
+  until ch=#27;
+  writeln('the count is ',counter:6);
+  readkey;
+end.
+
+
+time=1000;vol=13ˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆuses vgaliza,crt;
+var
+  s1, s2                  :array[0..1024]of integer;
+  ex, sx                  :integer;
+  pos1, pos2              :integer;
+  ypos, yposu, yposd      :integer;
+  line1, line2            :integer;
+  minx, maxx, miny, maxy  :integer;
+  pf                      :integer;
+
+{procedure fill(px,py,pc:integer);
+begin
+  pf:=yeyun(px,py);
+  yeyan(px,py,pc);
+  pos1:=0;
+  pos2:=0;
+  minx:=0;
+  miny:=0;
+  maxx:=319;
+  maxy:=199;
+            sx:=px-1;
+            ex:=px+1;
+            while(sx>=minx)and(yeyun(sx,py)=pf)do
+            begin
+              yeyan(sx,py,pc);
+              dec(sx);
+            end;
+            inc(pos2);
+            s2[pos2]:=sx+1;
+            inc(pos2);
+            s2[pos2]:=py;
+            while(ex<=maxx)and(yeyun(ex,py)=pf)do
+            begin
+              yeyan(ex,py,pc);
+              inc(ex);
+            end;
+            inc(pos2);
+            s2[pos2]:=ex-1;
+
+  repeat
+    while (pos2>0) do
+    begin
+      ex:=s2[pos2];
+      dec(pos2);
+      ypos:=s2[pos2];
+      dec(pos2);
+      sx:=s2[pos2];
+      dec(pos2);
+      for line1:=sx to ex do
+      begin
+        if ypos>miny then
+        begin
+          yposu:=ypos-1;
+          if (yeyun(line1,yposu)=pf)then
+          begin
+            yeyan(line1,yposu,pc);
+            sx:=line1-1;
+            ex:=line1+1;
+            while(sx>=minx)and(yeyun(sx,yposu)=pf)do
+            begin
+              yeyan(sx,yposu,pc);
+              dec(sx);
+            end;
+            inc(pos1);
+            s1[pos1]:=sx+1;
+            inc(pos1);
+            s1[pos1]:=yposu;
+            while(ex<=maxx)and(yeyun(ex,yposu)=pf)do
+            begin
+              yeyan(ex,yposu,pc);
+              inc(ex);
+            end;
+            inc(pos1);
+            s1[pos1]:=ex-1;
+          end;
+        end;
+
+
+        if ypos<maxy then
+        begin
+          yposd:=ypos+1;
+          if (yeyun(line1,yposd)=pf)then
+          begin
+            yeyan(line1,yposd,pc);
+            sx:=line1-1;
+            ex:=line1+1;
+            while(sx>=minx)and(yeyun(sx,yposd)=pf)do
+            begin
+              yeyan(sx,yposd,pc);
+              dec(sx);
+            end;
+            inc(pos1);
+            s1[pos1]:=sx+1;
+            inc(pos1);
+            s1[pos1]:=yposd;
+            while(ex<=maxx)and(yeyun(ex,yposd)=pf)do
+            begin
+              yeyan(ex,yposd,pc);
+              inc(ex);
+            end;
+            inc(pos1);
+            s1[pos1]:=ex-1;
+          end;
+        end;
+      end;
+    end;
+
+
+    while (pos1>0) do
+    begin
+      ex:=s1[pos1];
+      dec(pos1);
+      ypos:=s1[pos1];
+      dec(pos1);
+      sx:=s1[pos1];
+      dec(pos1);
+      for line2:=sx to ex do
+      begin
+        if ypos>miny then
+        begin
+          yposu:=ypos-1;
+          if (yeyun(line2,yposu)=pf)then
+          begin
+            yeyan(line2,yposu,pc);
+            sx:=line2-1;
+            ex:=line2+1;
+            while(sx>=minx)and(yeyun(sx,yposu)=pf)do
+            begin
+              yeyan(sx,yposu,pc);
+              dec(sx);
+            end;
+            inc(pos2);
+            s2[pos2]:=sx+1;
+            inc(pos2);
+            s2[pos2]:=yposu;
+            while(ex<=maxx)and(yeyun(ex,yposu)=pf)do
+            begin
+              yeyan(ex,yposu,pc);
+              inc(ex);
+            end;
+            inc(pos2);
+            s2[pos2]:=ex-1;
+          end;
+        end;
+
+
+        if ypos<maxy then
+        begin
+          yposd:=ypos+1;
+          if (yeyun(line2,yposd)=pf)then
+          begin
+            yeyan(line2,yposd,pc);
+            sx:=line2-1;
+            ex:=line2+1;
+            while(sx>=minx)and(yeyun(sx,yposd)=pf)do
+            begin
+              yeyan(sx,yposd,pc);
+              dec(sx);
+            end;
+            inc(pos2);
+            s2[pos2]:=sx+1;
+            inc(pos2);
+            s2[pos2]:=yposd;
+            while(ex<=maxx)and(yeyun(ex,yposd)=pf)do
+            begin
+              yeyan(ex,yposd,pc);
+              inc(ex);
+            end;
+            inc(pos2);
+            s2[pos2]:=ex-1;
+          end;
+        end;
+      end;
+    end;
+  until (pos1 or pos2)=0;
+end;{fill}
+
+
+var a:word;
+begin
+  vgamode(2);
+  for a:=0 to 10000 do yeyan(a mod 320,a div 320 {random(320),random(400)},random(256));
+  for a:=0 to 12000 do yeyan(a mod 320,a div 320,yeyun(a mod 320,a div 320));
+  myfill(0,0,15);
+  while not keypressed do {for a:=0 to 255 do yeyan(160,100,a)};
+  filler(0,0,0);
+  readln;
+end.‚CCãããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããIã G 	    uses  crt,dos;
+
+const _500kbs      =$00;
+      _300kbs      =$40;
+      _250kbs      =$80;
+
+      double_stepping=$20;
+      known_media  =$10;
+
+      {reserve}
+
+      k720or1440  =$07;
+      k1200in1200 =$05;
+      k360in1200  =$04;
+      k360in360   =$03;
+      t1200in1200 =$02;
+      t360in1200  =$01;
+      t360in360   =$00;
+
+type
+    Disk_Table=record
+                   specify1,
+                   specify2,
+                   motor_off,
+                   bytes_per_sector,
+                   sector_per_track,
+                   gap_length,
+                   data_length,
+                   gap_format,
+                   fill_byte,
+                   head_settle_time,
+                   motor_start             :byte;
+              end;
+
+     disktype= (
+               (* -->  d[disksize]{{s[specialsize]}in[drivesize]}  *)
+
+                d360in360,
+                d1200in1200,
+                d720,
+                d1440,
+                d360in1200,
+
+                d360s800in1200,
+                d1200s1440,
+                d360s420,
+                d1200s1400,
+                d1440s1600,
+                d720s800
+               );
+
+     fat_types=(FAT12,FAT16,FAT32);
+
+      romdisktable=array[d360in360..d720s800] of record
+                       table:disk_table;
+                       mem4090:byte;
+                       media_desc:byte;
+                       interleave:byte;
+                   end;
+
+
+var   disktable        :^Disk_Table absolute 0:$1e*4;
+      sdisktable       :disk_table;
+      drive            :byte;
+      dt               :byte;
+
+    
+const romtable:romdisktable=(
+
+                  (*****    ORDINARY FORMAT     ****)
+
+                            { 360 in 360 }
+
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 09 ;
+                                    gap_length:$2A ;
+                                   data_length:$FF ;
+                                    gap_format:$50 ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{93}_250kbs+known_media+k360in360;
+                              media_desc:$FD;
+                              interleave:1
+                             ),
+                              
+
+                            { 1.2 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 15 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$54 ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{15} _500kbs+known_media+k1200in1200;
+                              media_desc:$F9;
+                              interleave:1
+                             ),
+
+                            { 720 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 09 ;
+                                    gap_length:$2A ;
+                                   data_length:$FF ;
+                                    gap_format:$50 ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{97}_250kbs+known_media+k720or1440;
+                              media_desc:$F9;
+                              interleave:1
+                             ),
+
+                            { 1.44 }
+                             (table:
+                              (
+                                      specify1:$AF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 18 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$6C ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{17}_500kbs+known_media+k720or1440;
+                              media_desc:$F0;
+                              interleave:1
+                             ),
+
+                            { 360 in 1.2}
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 09 ;
+                                    gap_length:$2A ;
+                                   data_length:$FF ;
+                                    gap_format:$50 ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{74}_300kbs+double_stepping+known_media+k360in1200;
+                              media_desc:$FD;
+                              interleave:1
+                             ),
+
+
+       (*****    SPECIAL FORMAT     ****)
+
+                           { 360 to 800 in 1.2}
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 10 ;
+                                    gap_length:$1B {2A} ;
+                                   data_length:$FF ;
+                                    gap_format:$28 {50} ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{57}_300kbs+known_media+k720or1440;
+                              media_desc:$F0;
+                              interleave:1
+                             ),
+
+                            { 1.2 to 1.44  interleave 2 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 18 ;
+                                    gap_length:$02 {1B} ;
+                                   data_length:$FF ;
+                                    gap_format:$02 ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{15} _500kbs+known_media+k1200in1200;
+                              media_desc:$F0;
+                              interleave:2
+                             ),
+
+                            { 360 to 420 in 1.2 interleave 3 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 10 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$1A ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{74}_300kbs+double_stepping+known_media+k360in1200;
+                              media_desc:$FD;
+                              interleave:3
+                             ),
+
+                            { 1200 to 1400 in 1.2 interleave 3 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 17 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$1A ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{15} _500kbs+known_media+k1200in1200;
+                              media_desc:$F9;
+                              interleave:3
+                             ),
+
+                            { 1440 to 1600 in 1.4 interleave 3 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 20 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$0A ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{17}_500kbs+known_media+k720or1440;
+                              media_desc:$F0;
+                              interleave:3
+                             ),
+
+                            { 720 to 800 in 720 interleave 3 }
+                             (table:
+                              (
+                                      specify1:$DF ;
+                                      specify2: 02 ;
+                                     motor_off:$25 ;
+                              bytes_per_sector: 02 ;
+                              sector_per_track: 10 ;
+                                    gap_length:$1B ;
+                                   data_length:$FF ;
+                                    gap_format:$1A ;
+                                     fill_byte:$F6 ;
+                              head_settle_time:$0F ;
+                                   motor_start: 08
+                              );
+                              mem4090:{97}_250kbs+known_media+k720or1440;
+                              media_desc:$F9;
+                              interleave:3
+                             )
+                            );
+
+procedure UpdateTable(diskt:disktype);
+begin
+     mem[$40:$90]:=romtable[diskt].mem4090;
+     disktable^:=romtable[diskt].table;
+end;
+
+procedure SaveTable;
+begin
+     dt:=mem[$40:$90];
+     sdisktable:=disktable^;
+end;
+
+procedure RestoreTable;
+begin
+     disktable^:=sdisktable;
+     mem[$40:$90]:=dt;
+end;
+
+procedure format(utracks:byte;udisktype:disktype);
+var   x,retries,err    :byte;
+      track,head       :byte;
+      regs             :registers;
+      order            :array[1..25] of byte;
+      format_field     :array[1..25,1..4] of byte;
+      sectors_total,
+      sectors_left     :word;
+      percent          :real;
+      interleave       :byte;
+      sec_no:byte;
+      spt:byte;
+begin
+(*     spt:=romtable[udisktype].table.sector_per_track;
+     interleave:=romtable[udisktype].interleave;
+
+{****   setup ordering of sectors based on interleave value *******}
+     begin
+       for x:=1 to 25 do
+         order[x]:=0;
+       sec_no:=0;
+       for x:=1 to spt do
+       begin
+           while (order[sec_no+1]<>0) do
+             sec_no:=sec_no+1;
+           order[sec_no+1]:=x;
+           sec_no:=(sec_no + interleave) mod spt;
+       end;
+     end;
+
+     for x:=1 to spt do
+     begin
+          format_field[x,3]:=order[x];
+          format_field[x,4]:=disktable^.bytes_Per_sector;
+     end;*)
+
+     with regs do {reset}
+     begin
+          ah:=0;
+          dl:=drive;
+          UpdateTable(udisktype);
+          intr($13,regs);
+     end;
+
+(*     sectors_total:=utracks*2*spt;
+     sectors_left :=sectors_total;
+     gotoxy(1,1);
+     writeln('T=   0 H=   0');
+     percent:=100-(sectors_left/sectors_total)*100;
+     write(' Percent completed: ');
+     writeln(round(percent):3,' %');
+
+     for track:=0 to utracks-1 do
+     begin
+          for x:=1 to spt do format_field[x,1]:=track;
+          for head:=0 to 1 do
+          begin
+               for x:=1 to spt do format_field[x,2]:=head;
+               retries:=0;
+               repeat
+                  err:=0;
+                  with regs do
+                  begin
+                       ah:=5;
+                       al:=spt;
+                       ch:=track;
+                       cl:=0{1}{spt};
+                       dh:=head;
+                       dl:=drive;
+                       es:=seg(format_field);
+                       bx:=ofs(format_field);
+                       UpdateTable(udisktype);
+                       intr($13,regs);
+                       if (ah<>0) then
+                       begin
+                            err:=ah;
+                            inc(retries);
+                            if retries > 3 then
+                            begin
+                              writeln('(',retries,
+                                    ') Error in format: TRACK ',track);
+                              readln;
+                            end;
+                            ah:=0;
+                            dl:=drive;
+                            UpdateTable(udisktype);
+                            intr($13,regs);
+                       end;
+                  end;{ regs}
+               until (err=0) or (retries>3);
+               if (retries > 3) then
+               begin
+                    writeln('Error in track ',track,' head ',head);
+               end;
+               dec(sectors_left,spt);
+               gotoxy(1,1);
+               writeln('T= ',track:3,' H= ',head:3);
+               percent:=100-(sectors_left/sectors_total)*100;
+               write(' Percent completed: ');
+               writeln(percent:3:2);
+          end; {head}
+     end; {track}*)
+end;
+
+type
+      Boot_Record=record
+                       jump                :byte;{ $E9}
+                       offset_jump         :word;
+                       OEM_ID              :array[1..8] of char;
+                       bytes_per_sector    :word;
+                       sectors_per_cluster :byte;
+                       sectors_in_reserve  :word;
+                       copies_of_FAT       :byte;
+                       root_dirs           :word;
+                       sectors             :word;
+                       media               :byte;
+                       sectors_per_FAT     :word;
+                       sectors_per_track   :word;
+                       heads               :word;
+                       hidden_sector       :longint;
+                       sectors32           :longint; {if sectors = 0}
+                     {extended boot record}
+                       drive_              :byte;
+                       r1                  :byte;
+                       signature           :byte;{29h}
+                       serial2,serial1     :word;
+                       volume_label        :array[1..11] of char;
+                       FILE_system_ID      :array[1..8] of char;
+                  end;
+
+      directory = record
+                       name     :array[1..8] of char;
+                       ext      :array[1..3] of char;
+                       attr     :byte;
+                       reserved :array[1..10] of byte;
+                       time     :word;
+                       date     :word;
+                       cluster1 :word;
+                       size     :longint;
+                  end;
+
+var   boot:boot_record;
+
+procedure St_to_ANY(st:String;var buf;l:integer);
+type ar=array[1..128] of char;
+var stl,x:integer;
+begin
+     stl:=length(st);
+     if l-stl<0 then stl:=l;
+     for x:=1 to stl do ar(buf)[x]:=st[x];
+     for x:=stl+1 to l do ar(buf)[x]:=' ';
+end;
+
+{$S-}
+procedure Boot_Code;assembler;
+asm
+        cli
+        xor     ax,ax                {;Place stack segment}
+        mov     ss,ax                {;     and stack offset}
+        mov     sp,0                 {;     at Location 0000:0000}
+        sti                          {;Prepare for interrupts}
+        mov     ah,1                 {;Set Cursor size}
+        mov     cx,2019h             {;Setting CH>CL removes Cursor (I hope!)}
+        int     10h                  {;Commence...}
+        mov     ax,0600h
+        mov     bx,2200h
+        mov     cx,00
+        mov     dx,184fh
+        int     10h
+        mov     bx,2
+        mov     ah,0bh
+        int     10h
+        mov     ax,7c0h              {;Assuming this is a Boot Sector at 0:7c00}
+        mov     ds,ax                {;Make sure DS points at Segment of MSG}
+        mov     ax,offset boot_code
+        mov     si,offset @msg+TYPE Boot{;Source index should point at MSG}
+        sub     si,ax
+        mov     ax,0b800h
+        mov     es,ax
+        mov     di,1166-160            {;Column where text would appear}
+        mov     bx,di                  {;Save a copy of column to BX}
+        cld
+@pr:    lodsb                         { ;Load byte}
+        or      al,al                 {;Verify if Null ""}
+        jz      @done                 {;Yes?  then done in this routine}
+        cmp     al,13                 {;No, then check if CHR is <enter>}
+        jnz     @cont                 {;Not <enter>?  then continue...}
+        add     bx,160                {;Yes! increment BX which is a copy of}
+        mov     di,bx                 {;original DI and transfer it to DI}
+        jmp     @pr
+@cont:  mov     ah,17h               { ;Color Attribute = 17h = 10111b}
+        stosw                        {;Transfer CHR and Attribute to DI
+    ; Create a shadow of MSG by Zeroing the attribute at [DI+0163]}
+        mov     byte ptr es:[di+0163],0
+        jmp     @pr
+@done:
+        mov     ah,1
+        int     16h
+        jz      @done0
+        mov     ah,0
+        int     16h
+        jmp     @done
+@done0: mov     ah,0                 {  ;Service 00h for AH}
+        int     16h                  {;    for reading Keyboardz}
+        cmp     al,1bh
+        jnz     @done1
+        db      0EAh                 { jmp     @Reset_Comp}
+        dd      0ffff0000h
+@done1: mov     bx,0
+        mov     ah,0bh
+        int     10h
+        mov     ax,3                 {;If key was pressed so...}
+        int     10h                  {;  ...Clear the screen then...}
+        int     19h                  {;       ...Load Boot strap... OK!}
+
+@msg:   db      "…ÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕª",13
+        db      "∫                             ∫",13
+        db      "∫    Personal Property of     ∫",13
+        db      "∫                             ∫",13
+        db      "∫  LEAH FRANCISCA V. NERONA   ∫",13
+        db      "∫                             ∫",13
+        db      "∫        dataQuest            ∫",13
+@$mac:  db      "∫                             ∫",13
+        db      "»ÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕÕº",0
+end;
+procedure end_boot_code;assembler;
+asm
+end;
+{$S+}
+
+function Dectohex(decimal:longint):string;
+const Hex_Str:array [0..15] of char = '0123456789ABCDEF';
+var  remainder:byte;
+     hex_num:string;
+begin
+     hex_num:='';
+     while decimal > 15 do
+     begin
+          remainder:=decimal mod 16;
+          hex_num:=hex_str[remainder]+hex_num;
+          decimal:=decimal div 16;
+     end;
+     hex_num:=hex_str[decimal]+hex_num;
+     while length(hex_num) < 4 do hex_num:='0'+hex_num;
+     dectohex:=hex_num;
+end;
+
+procedure Boot_maker(usectors_per_cluster:byte;
+                     uroot_dirs:word;
+                     utracks:byte;
+                     ufat_type:fat_Types;
+                     udisktype:disktype);
+
+var   regs:registers;
+      spt:byte;
+
+      procedure Initialize;
+      var total_sectors:word;
+      begin
+           total_sectors:=spt*utracks*2;
+           with boot do
+           begin
+                jump                :=$E9;             {}
+                offset_jump         :=sizeof(boot)-3;  {}
+                St_to_ANY('DLSU S16',OEM_ID,8);        {}
+                bytes_per_sector    :=512;             {}
+                sectors_per_cluster :=usectors_per_cluster;
+                sectors_in_reserve  :=1;               {}
+                copies_of_FAT       :=2;               {}
+                root_dirs           :=uroot_dirs;
+                sectors             :=0;
+                media               :=romtable[udisktype].media_desc;
+                sectors_per_FAT     :=0;
+                sectors_per_track   :=spt;
+                heads               :=2;               {}
+                hidden_sector       :=0;               {}
+                sectors32           :=0; {if sectors = 0}
+
+              {exte : Å â    Ö   Å Å Å Å Å Å Å Å  Å Å Å Å Ç 	 	 	 	Å %Å 
+Å Å < Å â     Ñ  Å Å Å Å Å Å Å Å Å Å Å Å Å Ç  	 	 	Å %Å 
+Å Å Å / Å 	 Ö   Ñ  Å Å  Å Å Å Å Å Å Å Å Å Ç 	 	 	Å %Å 
+Å Å 
+  + Å Å  Ñ  á    Å Å Å Å Å Å Å Å Å Å Å Å Ç 	Å 	 	Å %Å 
+Å Å  Å  ' Ç Å  Ç  É  Å Å Å Å Å Å Å Å Å Ñ  Å Ç 	 		 	Å %Å 
+Å   Å    Å Ü    á     Å Å Å Å Å Å  Å Å Ñ  Å Ç 	Å 	 	 $Å 
+Å 
+ Å     Å  Å á    Å Å  Å Å Å 
+
+ Ç Å Ñ  Å Ç 	Å 	 	 	 Å 
+Å     Å Å É   Ñ  Å Å  Ç Å Å  Å Å Å Å Ç 	 	Å 
+	 Å 
+Å Å  Å	 Å Å Ö   Ü   Å Å  Å Å Å Ñ  Å Ç 	  	Å 	 Å 
+Å Å Ñ  Å Å Å  Ñ  â    Å Å $ Å á    Å	 "	 	 Å 
+Å Å Å  Å Å Å à     Å Ñ  Å Å =Å á   Å  #	Å 	 	 Å 
+Å Å Å Ñ  Å Å Å  Ö  Å Ñ  Å Å =Å á   Å 	Å $	Å 		 	Å 	 
+Å 
+Å Å Å Å Å Å Å ä     à    Å Å =Å Ñ  Å Å 	Å $	Å 	 	Å 	Å 
+Å 
+Å Å  Å Å Å Å ä     Ö   Å Å Å =Å Å Å Å Å 	Å $	Å 	 	Å 
+Å 
+Å Å  Å Å Å â     Ü    Å Å Å =Å Å Å Å Å 	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å Å Å à    Ü     Å Å > Å Å Å 	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å Å Å   Å Å D Ç Å 	Å $	Å 	Å 	Å 
+Å 
+Å  Å Å Å  Å   Å Å J 	Å $	Å 	Å 	Å 
+Å 
+Å Å Ü   Å Å Å   
+ Å X	Å $	Å 	Å 	Å 
+Å 
+Å Å  Å  Å É  Å    Ç Å X	Å $	 	Å 	Å 
+Å 
+Å  Ñ  Å É   É  É   Å Å X	Å "	 	 	Å 	Å 
+Å 
+Å Å  É  Å Å  É  Ö   á    Å  à    Å X	Å  	 		 	Å 	Å 
+Å 
+Å Å Å  Å É  Å ï           â     Å Å X	Å 	 	 
+	Å 	 
+Å 
+Å Å Å Å á    Å á    Ñ   Ç å        Å Å X	Å 	 	 	Ü 	  	 
+Å 
+Å Å Å Å  ä    Å ï          Ü   Å Å &Ñ.	Å 	 	 	Å 
+Å 
+Å Å Å Å à    
+Å â     á     Å Å %É0	Ç 	 	 #	 	Å 
+Å 
+Å Å 
+Å Å á     Å Å Å Å Å $,	 	 	 #	 	Å 
+Å 
+Å Å 	Å Å í         Å Å Å Å Å Å #
+Å *	Å 	 	 #	 		Å 
+Å 
+Å Å Å 
+Å Å ë       Å Å Ö   Å Å Å Å "Å )	 	 "	 	Å 
+Å 
+Å Å É  	Å Ç  Å  É  Å Å  Ü   Å Å Å Å "Å Å (		 	 	 	Å 
+Å 
+Å à    	Å â     Ñ  Å Å Å Ñ  Å Å Å Å !á   Å (	 	 	 	Å 
+Å 
+Å   Å 	 É  É  Ñ  Å Å Å Å Å Å ! Ö   Å '	 		Å 	Å 	 	Å 
+Å 
+Å !Ñ   
+ Å Å  Ü    Ö   É  Å Å Å !Å '	 	Å 	Å 	 	Å 
+Å 
+Å "Å Å  É    	Ü    â    à    Å Å Å !Å (	 	Å 	 	Å 
+Å 
+Å # Å    	 Å è        É  Å Å Å  Å (	Å 	Å 	 	Å 
+Å 
+Å %É    É  Ñ  å      à    Å Å Å  Å )	Å 	Å 	 	Å 
+Å 
+Å &   Ç Å  á    â     Å Å ! )	Å 	Å 
+	 	Å 
+Å 
+Å 'Å  Ñ  Å É  Ñ   Å Å "	  % 	Å 	Å 	 	 
+Å 
+Å &Å 	  Å É   Å Å &  Ñ  	 	Å 	Å 	 	 Ç	 
+Å 
+Å &Å   Ç Å   Å Å %Å 
+Å Ü    	 	Å 	Å 	 	 	Å 
+Å 
+Å % 
+  Ç Å  Å Å Å Å $Å Å â     	 	Å 	Ö 		  	 	Å 
+Å 
+Å $Å   Ñ  Å Å Å Å Å Å $Å Å à    	 
+	Å 	 	       writeln('Error in size of boot code!');
+               halt;
+          end;
+
+         { Setup the boot code right after the boot info }
+          move(@boot_code^,buffer^[sizeof(boot)],size_code);
+          buffer^[510]:=$55;buffer^[511]:=$AA;
+          for x:=0 to sectors_in_reserve-1 do
+          begin
+              Write_to_Sector(x,buffer^,'boot ');
+              writeln(x+1);
+          end;
+
+         { Setup the FAT }
+          fillchar(buffer^,512,0);
+          for x:=0 to copies_of_FAT-1 do
+          begin
+               case ufat_type of
+                  FAT12:begin
+                          buffer^[0]:=media;
+                          buffer^[1]:=$FF; buffer^[2]:=$FF;
+                        end;
+                  FAT16:begin
+                          buffer^[0]:=media;buffer^[1]:=$FF;
+                          buffer^[2]:=$FF;buffer^[3]:=$FF;
+                        end;
+                  FAT32:begin
+                          buffer^[0]:=media;
+                          buffer^[1]:=$FF;buffer^[2]:=$FF;buffer^[3]:=$FF;
+                          buffer^[4]:=$FF;buffer^[5]:=$FF;buffer^[6]:=$FF;
+                          buffer^[7]:=$FF;
+                        end;
+               end;
+
+               Write_to_Sector(sectors_in_reserve+x*sectors_per_FAT,
+                               buffer^,'FAT ');
+               writeln(x+1);
+
+               buffer^[0]:=0;buffer^[1]:=0;buffer^[2]:=0;buffer^[3]:=0;
+               buffer^[4]:=0;buffer^[5]:=0;buffer^[6]:=0;buffer^[7]:=0;
+
+               for y:=1 to sectors_per_FAT-1 do
+               begin
+                   Write_to_Sector(sectors_in_reserve+y+x*sectors_per_FAT,
+                                   buffer^,'FAT ');
+                   writeln(x+1,'-',y+1);
+               end;
+          end;
+
+          buffer^[0]:=0;buffer^[1]:=0;buffer^[2]:=0;
+          with directory(ADDR(buffer^)^) do
+          begin
+               St_to_ANY('FORMAT 43',name,11);
+               attr:=VolumeID;
+          end;
+          Write_to_Sector(sectors_in_reserve+copies_of_FAT*sectors_per_FAT,
+                          buffer^,'DIR ');
+          writeln(1);
+
+          with directory(ADDR(buffer^)^) do
+          begin
+               St_to_ANY(#0#0#0#0#0#0#0#0#0#0#0,name,11);
+               attr:=0;
+          end;
+          for x:=1 to root_dir_sectors-1 do
+          begin
+               buffer^[0]:=0;buffer^[1]:=0;buffer^[2]:=0;
+               Write_to_Sector(sectors_in_reserve+
+                               copies_of_FAT*sectors_per_FAT+x,buffer^,'DIR ');
+               writeln(x+1);
+          end;
+          writeln('Serial number ',dectohex(serial1):4,'-',dectohex(serial2):4);
+     end;
+     freemem(buffer,512);
+end;
+
+begin
+     clrscr;
+     drive:=0;
+     savetable;
+     format(80,d360s800in1200);
+(*     boot_maker(1,
+                  { sectors per cluster }
+                224,
+                  { root directory entries }
+                80,
+                  { tracks }
+                fat12,
+                  { fat type}
+                d1200s1440
+                  { disk type }
+               );
+     restoretable;*)
+end.uses vgaliz,crt,dos;
+var
+  x,y,a,b:integer;
+  p:pointer;
+  s:string;
+  mys,myo:integer;
+begin
+  getmem(p,65535);
+  vgamode(1);
+  aload('e:\tp\bin\turbo.ico',p^);
+  myo:=ofs(p^);
+  mys:=seg(p^);
+{  for c:=0 to 255 do myup(c,random(64),random(64),random(64));}
+  for b:=0 to 199 do
+  for a:=0 to  15 do
+  yeyan(a,b,mem[mys:myo+a+b*16]);
+  readln;
+end.#CáÉÉááááááÉÉÉÉÉÉÉÉÉÉ
+É
+ÉÉÉÉÉÉÉ
+É	É
+É
+É
+É
+É
+É
+É
+É	ÉÉ	É	É	É	É	É	É	ÉÉÑÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ	É	ÉÉ	É	É	É	É	É	É
+É
+É	É
+É
+É
+É
+É
+É
+ÉÉÉ
+ÉÉÉÉÉÉÉ É É É É É É É É                   Å Å  Å Å Å Å Å Å Cãããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããã6ãÅããAãÅããAãÅããAãÅããAãÅããAãããBã(ããBã(ããBã G 	    

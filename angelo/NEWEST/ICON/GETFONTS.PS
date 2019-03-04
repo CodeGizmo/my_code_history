@@ -1,0 +1,19 @@
+uses crt,printer;
+begin
+  writeln(lst,'/Helvetica findfont');
+  writeln(lst,'12 scalefont setfont');
+  writeln(lst,'/astring 80 string def');
+  writeln(lst,'/writefont');
+  writeln(lst,'{pop astring cvs dup stringwidth pop');
+  writeln(lst,'exch show neg -14 rmoveto}');
+  writeln(lst,'def');
+  writeln(lst,'100 700 moveto');
+  writeln(lst,'FontDirectory {writefont} forall');
+  writeln(lst,'showpage');
+{  writeln(lst,'
+  writeln(lst,'
+  writeln(lst,'
+  writeln(lst,'
+  writeln(lst,'
+  writeln(lst,'}
+end.

@@ -1,0 +1,21 @@
+unit rolfazil;
+interface
+
+var
+  buncom,bcom   :longint;
+  com,uncom     :longint;
+  compresssize,
+  upos,cpos     :word;
+type
+  myptr=array[0..65530]of byte;
+
+
+procedure huffmanc(var bufin,bufout;unhuffsize:word);
+procedure huffmanu(var bufin,bufout);
+procedure slidec(var bufin,bufout;usize:word;cbits:byte);
+procedure slideu(var bufin,bufout);
+procedure slidewc(var bufin,bufout;usize:word;cbits:byte);
+procedure slidewu(var bufin,bufout);
+procedure instantu(var bufin,bufout);
+procedure compress(var gbuf,pbuf;maxsize:word);
+

@@ -1,0 +1,87 @@
+
+ Volume in drive D is ANGELODRIVE    Serial number is 1863:11F9
+
+ Directory of  d:\cobmachi\*.cbl
+
+machine.cbl     
+       7,003 bytes in 1 file(s)              8,192 bytes allocated
+
+    Total for:  d:\cobmachi\*.cbl
+       7,003 bytes in 1 file(s)              8,192 bytes allocated
+
+ Directory of  d:\progapli\rachel\*.cbl
+
+list.cbl        
+       2,842 bytes in 1 file(s)              4,096 bytes allocated
+
+    Total for:  d:\progapli\rachel\*.cbl
+       2,842 bytes in 1 file(s)              4,096 bytes allocated
+
+    Total for:  d:\progapli\*.cbl
+       2,842 bytes in 1 file(s)              4,096 bytes allocated
+
+ Directory of  d:\cobol\*.cbl
+
+addrec.cbl      
+       3,208 bytes in 1 file(s)              4,096 bytes allocated
+
+ Directory of  d:\cobol\samples\*.cbl
+
+admouse.cbl     arman.cbl       calc.cbl        calendar.cbl    case.cbl      
+declare.cbl     diophant.cbl    expand.cbl      extfile.cbl     functest.cbl  
+funkey.cbl      intrins.cbl     keybmenu.cbl    logoper.cbl     mousmenu.cbl  
+nested.cbl      popup.cbl       printesc.cbl    report.cbl      smplaccp.cbl  
+spltjoin.cbl    sscntrl.cbl     status.cbl      ticbug.cbl      tictac.cbl    
+tstcomp.cbl     tstdebug.cbl    
+     210,545 bytes in 27 file(s)           239,616 bytes allocated
+
+ Directory of  d:\cobol\samples\asmdemo\*.cbl
+
+add.cbl         
+       2,522 bytes in 1 file(s)              4,096 bytes allocated
+
+    Total for:  d:\cobol\samples\asmdemo\*.cbl
+       2,522 bytes in 1 file(s)              4,096 bytes allocated
+
+ Directory of  d:\cobol\samples\mudemo\*.cbl
+
+mudemo.cbl      stockin.cbl     stockioa.cbl    stockiom.cbl    stockout.cbl  
+      76,417 bytes in 5 file(s)             81,920 bytes allocated
+
+    Total for:  d:\cobol\samples\mudemo\*.cbl
+      76,417 bytes in 5 file(s)             81,920 bytes allocated
+
+ Directory of  d:\cobol\samples\panels\*.cbl
+
+panbigsc.cbl    panbordr.cbl    pandemo.cbl     panelex1.cbl    panelex2.cbl  
+pantutor.cbl    
+     119,761 bytes in 6 file(s)            126,976 bytes allocated
+
+    Total for:  d:\cobol\samples\panels\*.cbl
+     119,761 bytes in 6 file(s)            126,976 bytes allocated
+
+ Directory of  d:\cobol\samples\preproc\*.cbl
+
+asmcobol.cbl    preproc.cbl     preprox.cbl     working.cbl     
+      81,636 bytes in 4 file(s)             86,016 bytes allocated
+
+    Total for:  d:\cobol\samples\preproc\*.cbl
+      81,636 bytes in 4 file(s)             86,016 bytes allocated
+
+ Directory of  d:\cobol\samples\pwbtutor\*.cbl
+
+emplhlth.cbl    emplmain.cbl    pentot2.cbl     
+       3,814 bytes in 3 file(s)              6,144 bytes allocated
+
+    Total for:  d:\cobol\samples\pwbtutor\*.cbl
+       3,814 bytes in 3 file(s)              6,144 bytes allocated
+
+    Total for:  d:\cobol\samples\*.cbl
+     494,695 bytes in 46 file(s)           544,768 bytes allocated
+
+    Total for:  d:\cobol\*.cbl
+     497,903 bytes in 47 file(s)           548,864 bytes allocated
+
+    Total for:  d:\*.cbl
+     507,748 bytes in 49 file(s)           561,152 bytes allocated
+   7,903,232 bytes free
