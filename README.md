@@ -6,14 +6,15 @@ Main Code Summary List:
 This legacy source codes collection of mine that I coded as a hobby includes: (from 1989 to 1997, from high school to college)
 * Drawing app source codes with image files that I made, encoded with my own codec.
 * Compression/Decompression (Huffman/Sliding window/etc) source codes.
-* *.COM Dissasembler source codes.
-* Boot sector/Boot manipulation source codes.
+* *.COM Dissasembler App programmed using turbo pascal.
+* Boot sector/Boot manipulation source codes with both pascal and assembly language versions.
 * Sound manipulation source codes.
-* epson and postscript printer language manipulation source codes.
-* My own pascal graphics unit replacement source codes which has better performance than turbo pascals own graphics library.
+* Epson and postscript printer language manipulation source codes.
+* My own turbo pascal graphics unit replacement source codes with asm inline codes which has better performance than turbo pascals own graphics library.
 * Math coprocessor indirect replacement mainly for square-root computation, etc.
 * Source codes I made to help my close friends project, mainly Lenin, Razette and etc.
 * And other hobby/experimental pascal/assembly language source codes.
+* Lots of my BASIC and turbo basic source codes backup during high school days are probably gone with the bad sectored diskettes I kept them before.  There is a chance that some of my zipped backups might still have them.
 
 College Projects that I created source codes:
 * Self designed diagram using an MC6800 processor chip ready for a practical proof of concept minicomputer with assembly language source codes.
