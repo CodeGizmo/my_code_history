@@ -3,18 +3,26 @@
 Main Code Summary List:
 [2019-03-04, 4:32pm est] Adding all my legacy hobby codes(Pascal, Assemby language and very few beginners C Language) that I was able to save when I was still a teenager and college student. My main college projects\hobby projects will be added later(as of 2019-03-04).
 
-This legacy code collection of mine includes: (from 1989 to 1997)
+This legacy source codes collection of mine that I coded as a hobby includes: (from 1989 to 1997, from high school to college)
 * Drawing app source codes with image files that I made, encoded with my own codec.
 * Compression/Decompression (Huffman/Sliding window/etc) source codes.
-* COM Dissasembler source codes.
+* *.COM Dissasembler source codes.
 * Boot sector/Boot manipulation source codes.
 * Sound manipulation source codes.
-* epson and postscript print manipulation source codes.
+* epson and postscript printer language manipulation source codes.
 * My own pascal graphics unit replacement source codes which has better performance than turbo pascals own graphics library.
 * Math coprocessor indirect replacement mainly for square-root computation, etc.
 * Source codes I made to help my close friends project, mainly Lenin, Razette and etc.
 * And other hobby/experimental pascal/assembly language source codes.
 
+College Projects that I created source codes:
+* Self designed diagram using an MC6800 processor chip ready for a practical proof of concept minicomputer with assembly language source codes.
+* TSR concurrent multi-tasking memory viewer in DOS command console.
+* Playable Graphical Magic the Gathering card game proof of concept source codes developed using delphi.
+* Fully working Digital Message Display Scroller with 16x8 LED kit interfaced with parallel port programmed with turbo pascal codes.
+* Playable Games of the General board game arbiter device interface with parallel port with delphi source codes.
+* Usable Restaurant Cash Register/Inventory database project coded with pascal and SQL language using Delphi ide.
+* Inventory and other internal procdures for "BAYER" database system project programmed with MS Access.
 
 ===============================================================================
 Historical Coding Background:
